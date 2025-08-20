@@ -1,0 +1,215 @@
+/* Variables de diseño */
+:root {
+  --login-color: #3b82f6;
+  --login-hover: #2563eb;
+  --logout-color: #ef4444;
+  --logout-hover: #dc2626;
+  --icon-color: white;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --transition-speed: 0.4s;
+  --bubble-size: 60px;
+  --mobile-bubble-size: 50px;
+}
+
+/* Base de la burbuja */
+.auth-bubble {
+  position: fixed;
+  bottom: 30px;
+  left: 30px;
+  z-index: 999;
+  width: var(--bubble-size);
+  height: var(--bubble-size);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all var(--transition-speed) cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  box-shadow: 
+    0 4px 12px var(--shadow-color),
+    inset 0 2px 4px rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, var(--login-color), #60a5fa);
+  overflow: visible;
+}
+
+/* Estado de logged-in */
+.auth-bubble.logged-in {
+  background: linear-gradient(135deg, var(--logout-color), #f87171);
+}
+
+/* Núcleo de la burbuja */
+.bubble-core {
+  position: relative;
+  width: calc(100% - 8px);
+  height: calc(100% - 8px);
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition-speed) ease;
+}
+
+/* Contenedor de iconos */
+.icon-container {
+  position: relative;
+  width: 60%;
+  height: 60%;
+}
+
+.auth-icon {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: var(--icon-color);
+  transition: all var(--transition-speed) cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  font-size: 1.4em;
+}
+
+.main-icon {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+.secondary-icon {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.5);
+}
+
+/* Efectos hover */
+.auth-bubble:hover {
+  transform: scale(1.1);
+  box-shadow: 
+    0 6px 20px var(--shadow-color),
+    inset 0 4px 8px rgba(255, 255, 255, 0.2);
+}
+
+.auth-bubble:hover .bubble-core {
+  transform: scale(0.95);
+}
+
+.auth-bubble.logged-in:hover {
+  background: linear-gradient(135deg, var(--logout-hover), #ef4444);
+}
+
+.auth-bubble:not(.logged-in):hover {
+  background: linear-gradient(135deg, var(--login-hover), #3b82f6);
+}
+
+.auth-bubble:hover .main-icon {
+  transform: translate(-50%, -50%) scale(1.2);
+}
+
+/* Animación de cambio de estado */
+.auth-bubble.animating {
+  animation: pulse 1s ease;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1); }
+}
+
+/* Efecto de click */
+.auth-bubble.clicked {
+  animation: click 0.6s ease;
+}
+
+@keyframes click {
+  0% { transform: scale(1); }
+  25% { transform: scale(0.9); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+/* Tooltip */
+.tooltip {
+  position: absolute;
+  left: calc(100% + 15px);
+  background: white;
+  padding: 8px 15px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: #2d3748;
+  box-shadow: 0 3px 12px var(--shadow-color);
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: all var(--transition-speed) ease;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.auth-bubble:hover .tooltip {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Efecto de partículas */
+.particles {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.particle {
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background: white;
+  border-radius: 50%;
+  top: 50%;
+  left: 50%;
+  opacity: 0;
+  animation: particle var(--transition-speed) ease-out var(--delay) forwards;
+}
+
+@keyframes particle {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(
+      calc(cos(var(--angle)) * 30px),
+      calc(sin(var(--angle)) * 30px)
+    );
+  }
+}
+
+/* Interacción con iconos */
+.auth-bubble:hover .main-icon {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.5);
+}
+
+.auth-bubble:hover .secondary-icon {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1.2);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .auth-bubble {
+    bottom: 20px;
+    left: 20px;
+    width: var(--mobile-bubble-size);
+    height: var(--mobile-bubble-size);
+  }
+  
+  .auth-icon {
+    font-size: 1.2em;
+  }
+  
+  .tooltip {
+    font-size: 12px;
+    padding: 6px 12px;
+    left: calc(100% + 10px);
+  }
+}
