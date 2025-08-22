@@ -10,6 +10,8 @@ import Registro from './Registro/Registro';
 import MenuAdmin from './MenuAdmin/MenuAdmin.jsx';
 import CombinedBubble from './Whatsapp/CombinedBubble.jsx';
 import AuthBubble from './Loginbutton/Loginbutton';
+import TotalDeudas from './TotalDeudas/TotalDeudas.jsx';
+import Estadisticas from './Estadisticas/Estadisticas.jsx';
 
 export default function App() {
   const [scrolled, setScrolled] = useState(false);
@@ -38,6 +40,8 @@ export default function App() {
             <Route path="/login" element={<LoginForm />} />
             <Route path="/registro" element={<Registro />} />          
             <Route path="/menuadmin" element={<MenuAdmin />} />
+            <Route path="/deudas" element={<TotalDeudas />} />
+            <Route path="/estadisticas" element={<Estadisticas />} />
           </Routes> 
           </main>
         <Footer />

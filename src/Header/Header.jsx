@@ -30,7 +30,7 @@ const Header = () => {
         <div className="logo-container">
           <Link to="/" className="logo-link">
             <img 
-              src="https://ppfmspwqiqawiiexaanb.supabase.co/storage/v1/object/public/imagenesoggi//oggi.png" 
+              src="https://cdn.builder.io/api/v1/image/assets/TEMP/3edde6bb0a5d03a5675a4386cedea6018b11ddde" 
               alt="Pincho Pan Fabrica" 
               className="logo"
             />
@@ -45,8 +45,8 @@ const Header = () => {
           </div>
           
           <div className="nav-links-container right-links">
-            <Link to="/productos" className="nav-link">PRODUCTOS</Link>
-            <Link to="/contacto" className="nav-link">CONTACTO</Link>
+            <Link to="/deudas" className="nav-link">TOTAL DEUDAS</Link>
+            <Link to="/estadisticas" className="nav-link">ESTADISTICAS</Link>
           </div>
         </nav>
 
@@ -57,10 +57,10 @@ const Header = () => {
 
         {/* Menú móvil */}
         <div className={`mobile-nav ${isMobileMenuOpen ? 'open' : ''}`}>
-          <Link to="/monturas" className="mobile-nav-link" onClick={toggleMobileMenu}>MONTURAS</Link>
-          <Link to="/lentescontacto" className="mobile-nav-link" onClick={toggleMobileMenu}>LENTES DE CONTACTO</Link>
-          <Link to="/productos" className="mobile-nav-link" onClick={toggleMobileMenu}>PRODUCTOS</Link>
-          <Link to="/contacto" className="mobile-nav-link" onClick={toggleMobileMenu}>CONTACTO</Link>
+          <Link to="/proveedores" className="mobile-nav-link" onClick={toggleMobileMenu}>PROVEEDORES</Link>
+          <Link to="/pedidos" className="mobile-nav-link" onClick={toggleMobileMenu}>PEDIDOS</Link>
+          <Link to="/deudas" className="mobile-nav-link" onClick={toggleMobileMenu}>TOTAL DEUDAS</Link>
+          <Link to="/estadisticas" className="mobile-nav-link" onClick={toggleMobileMenu}>ESTADISTICAS</Link>
         </div>
       </div>
     </header>

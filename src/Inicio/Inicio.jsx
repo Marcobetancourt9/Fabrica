@@ -33,28 +33,13 @@ const Inicio = () => {
       <section className="hero-section">
         <div className="hero-content">
           <img 
-            src="https://ppfmspwqiqawiiexaanb.supabase.co/storage/v1/object/public/imagenesoggi//oggi.png" 
-            alt="Oggi Logo" 
-            className="oggi-logo"
+            src="https://cdn.builder.io/api/v1/image/assets/TEMP/3edde6bb0a5d03a5675a4386cedea6018b11ddde" 
+            alt="Fabrica Logo" 
+            className="fabrica-logo"
           />
           <h1 className="hero-title">
-            <span className="hero-title-line1">¡Oggi tu centro óptico ideal!</span>
+            <span className="hero-title-line1">Base de Datos de los productos de la Fabrica</span>
           </h1>
-          <img 
-            src="https://ppfmspwqiqawiiexaanb.supabase.co/storage/v1/object/public/imagenesoggi//cashea.png" 
-            alt="Cashea Logo" 
-            className="cashea-logo"
-          />
-          <p className="hero-subtitle">Tiendas con <span className="highlight">Cashea</span></p>
-          <div className="cashea-tagline">Compra en cuotas lo que necesitas hoy</div>
-          <button 
-            className="hero-button" 
-            onClick={() => window.location.href="https://mobile.cashea.app/merchants/48e697d1-6474-4e97-8428-0151976837ae"}>
-            Descubre más
-          </button>
-          <br />
-          <br />
-          <br />
         </div>
         <div className="hero-wave"></div>
       </section>

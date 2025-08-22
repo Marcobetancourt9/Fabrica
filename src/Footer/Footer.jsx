@@ -103,57 +103,8 @@ const Footer = () => {
           </div>
         </div>
 
-        <div className="footer-bottom">
-          <div className="payment-methods">
-            <h4>Métodos de pago aceptados:</h4>
-            <div className="payment-icons">
-              <div className="payment-method">
-                <BsCreditCard className="payment-icon" />
-                <span>Tarjetas</span>
-              </div>
-              <div className="payment-method">
-                <BsCashCoin className="payment-icon" />
-                <span>Efectivo</span>
-              </div>
-              <div className="payment-method">
-                <BsBank2 className="payment-icon" />
-                <span>Transferencias</span>
-              </div>
-            </div>
-          </div>
-
-        {/* Botón de instalación PWA */}
-        {!isStandalone && (
-          <div className="pwa-install-section">
-            {installable && (
-              <button onClick={handleInstallClick} className="install-app-btn">
-                <FaDownload /> Instalar App
-              </button>
-            )}
-            
-            {isIOS && (
-              <button onClick={showIOSInstructions} className="ios-install-btn">
-                <FaDownload /> Añadir a Inicio
-              </button>
-            )}
-          </div>
-        )}
-
-          <div className="social-media">
-            <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="social-icon">
-              <FaFacebookF />
-            </a>
-            <a href="https://www.instagram.com/centroopticooggi/" target="_blank" rel="noopener noreferrer" className="social-icon">
-              <FaInstagram />
-            </a>
-            <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="social-icon">
-              <FaTwitter />
-            </a>
-          </div>
-        </div>
-
         <div className="copyright">
-          <p>© {new Date().getFullYear()} Centro Óptico Oggi. Todos los derechos reservados.</p>
+          <p>© {new Date().getFullYear()} Inversiones Pincho Pan Express II C.A. Todos los derechos reservados.</p>
           <div className="legal-links">
             <a href="/terminos">Términos y condiciones</a>
             <span> | </span>
