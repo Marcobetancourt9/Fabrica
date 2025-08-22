@@ -15,7 +15,6 @@ const TotalDeudas = () => {
   const [editandoId, setEditandoId] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
-  const [modoCalculoAutomatico, setModoCalculoAutomatico] = useState(true);
 
   // Cargar proveedores desde Firebase
   useEffect(() => {
@@ -39,15 +38,13 @@ const TotalDeudas = () => {
 
   // Calcular saldo pendiente automáticamente
   useEffect(() => {
-    if (modoCalculoAutomatico && nuevoProveedor.saldo && nuevoProveedor.pagos) {
-      const saldo = parseFloat(nuevoProveedor.saldo) || 0;
-      const pagos = parseFloat(nuevoProveedor.pagos) || 0;
-      setNuevoProveedor({
-        ...nuevoProveedor,
-        pendiente: (saldo - pagos).toFixed(2)
-      });
-    }
-  }, [nuevoProveedor.saldo, nuevoProveedor.pagos, modoCalculoAutomatico]);
+    const saldo = parseFloat(nuevoProveedor.saldo) || 0;
+    const pagos = parseFloat(nuevoProveedor.pagos) || 0;
+    setNuevoProveedor({
+      ...nuevoProveedor,
+      pendiente: (saldo - pagos).toFixed(2)
+    });
+  }, [nuevoProveedor.saldo, nuevoProveedor.pagos]);
 
   // Agregar nuevo proveedor
   const agregarProveedor = async () => {
@@ -56,9 +53,7 @@ const TotalDeudas = () => {
     try {
       const saldo = parseFloat(nuevoProveedor.saldo) || 0;
       const pagos = parseFloat(nuevoProveedor.pagos) || 0;
-      const pendiente = modoCalculoAutomatico 
-        ? saldo - pagos 
-        : parseFloat(nuevoProveedor.pendiente) || 0;
+      const pendiente = saldo - pagos;
 
       const docRef = await addDoc(collection(db, 'proveedores'), {
         nombre: nuevoProveedor.nombre,
@@ -98,12 +93,23 @@ const TotalDeudas = () => {
   const actualizarProveedor = async (id) => {
     try {
       const proveedorActualizado = proveedores.find(p => p.id === id);
+      // Recalcular el pendiente antes de guardar
+      const saldo = parseFloat(proveedorActualizado.saldo || 0);
+      const pagos = parseFloat(proveedorActualizado.pagos || 0);
+      const pendiente = saldo - pagos;
+      
       await updateDoc(doc(db, 'proveedores', id), {
         nombre: proveedorActualizado.nombre,
-        saldo: parseFloat(proveedorActualizado.saldo || 0),
-        pagos: parseFloat(proveedorActualizado.pagos || 0),
-        pendiente: parseFloat(proveedorActualizado.pendiente || 0)
+        saldo: saldo,
+        pagos: pagos,
+        pendiente: pendiente
       });
+      
+      // Actualizar el estado local con el pendiente recalculado
+      setProveedores(proveedores.map(p => 
+        p.id === id ? {...p, pendiente: pendiente} : p
+      ));
+      
       setEditandoId(null);
     } catch (error) {
       console.error('Error al actualizar proveedor:', error);
@@ -161,17 +167,6 @@ const TotalDeudas = () => {
         <div className="formulario-proveedor">
           <h2>Agregar Nuevo Proveedor</h2>
           
-          <div className="modo-calculo">
-            <label>
-              <input
-                type="checkbox"
-                checked={modoCalculoAutomatico}
-                onChange={() => setModoCalculoAutomatico(!modoCalculoAutomatico)}
-              />
-              Calcular saldo pendiente automáticamente
-            </label>
-          </div>
-          
           <div className="campos-formulario">
             <div className="input-group">
               <label>Nombre del proveedor</label>
@@ -199,7 +194,6 @@ const TotalDeudas = () => {
                 step="0.01"
                 value={nuevoProveedor.pagos}
                 onChange={(e) => setNuevoProveedor({...nuevoProveedor, pagos: e.target.value})}
-                disabled={!modoCalculoAutomatico}
               />
             </div>
             
@@ -209,8 +203,8 @@ const TotalDeudas = () => {
                 type="number"
                 step="0.01"
                 value={nuevoProveedor.pendiente}
-                onChange={(e) => setNuevoProveedor({...nuevoProveedor, pendiente: e.target.value})}
-                disabled={modoCalculoAutomatico}
+                readOnly
+                className="campo-solo-lectura"
               />
             </div>
             
@@ -301,23 +295,9 @@ const TotalDeudas = () => {
                     )}
                   </td>
                   <td>
-                    {editandoId === proveedor.id ? (
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={proveedor.pendiente}
-                        onChange={(e) => {
-                          const nuevosProveedores = proveedores.map(p => 
-                            p.id === proveedor.id ? {...p, pendiente: e.target.value} : p
-                          );
-                          setProveedores(nuevosProveedores);
-                        }}
-                      />
-                    ) : (
-                      <span className={`monto ${parseFloat(proveedor.pendiente || 0) > 0 ? 'saldo-pendiente' : 'saldo-cero'}`}>
-                        ${parseFloat(proveedor.pendiente || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    )}
+                    <span className={`monto ${parseFloat(proveedor.pendiente || 0) > 0 ? 'saldo-pendiente' : 'saldo-cero'}`}>
+                      ${parseFloat(proveedor.pendiente || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
                   </td>
                   <td>
                     <div className="acciones">

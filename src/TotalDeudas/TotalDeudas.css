@@ -407,3 +407,8 @@
     flex-wrap: wrap;
   }
 }
+.campo-solo-lectura {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  color: #666;
+}
