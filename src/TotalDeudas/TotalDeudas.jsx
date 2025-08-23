@@ -137,6 +137,7 @@ const TotalDeudas = () => {
 
   return (
     <div className="total-deudas-container">
+      <br />
       <header className="app-header">
         <h1>💰 Control de Deudas con Proveedores</h1>
         <p>Gestiona los saldos y pagos a tus proveedores</p>
