@@ -15,6 +15,7 @@ const TotalDeudas = () => {
   const [editandoId, setEditandoId] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
+  const [errores, setErrores] = useState({});
 
   // Cargar proveedores desde Firebase
   useEffect(() => {
@@ -36,10 +37,30 @@ const TotalDeudas = () => {
     cargarProveedores();
   }, []);
 
+  // Validar que los pagos no excedan el saldo
+  const validarPagos = (saldo, pagos) => {
+    const saldoNum = parseFloat(saldo) || 0;
+    const pagosNum = parseFloat(pagos) || 0;
+    
+    if (pagosNum > saldoNum) {
+      return "Los pagos no pueden ser mayores al saldo";
+    }
+    return null;
+  };
+
   // Calcular saldo pendiente automáticamente
   useEffect(() => {
     const saldo = parseFloat(nuevoProveedor.saldo) || 0;
     const pagos = parseFloat(nuevoProveedor.pagos) || 0;
+    
+    // Validar pagos
+    const errorPagos = validarPagos(saldo, pagos);
+    if (errorPagos) {
+      setErrores({...errores, pagos: errorPagos});
+    } else {
+      setErrores({...errores, pagos: null});
+    }
+    
     setNuevoProveedor({
       ...nuevoProveedor,
       pendiente: (saldo - pagos).toFixed(2)
@@ -48,11 +69,22 @@ const TotalDeudas = () => {
 
   // Agregar nuevo proveedor
   const agregarProveedor = async () => {
-    if (!nuevoProveedor.nombre.trim()) return;
+    if (!nuevoProveedor.nombre.trim()) {
+      setErrores({...errores, nombre: "El nombre es obligatorio"});
+      return;
+    }
+    
+    const saldo = parseFloat(nuevoProveedor.saldo) || 0;
+    const pagos = parseFloat(nuevoProveedor.pagos) || 0;
+    
+    // Validar pagos antes de agregar
+    const errorPagos = validarPagos(saldo, pagos);
+    if (errorPagos) {
+      setErrores({...errores, pagos: errorPagos});
+      return;
+    }
     
     try {
-      const saldo = parseFloat(nuevoProveedor.saldo) || 0;
-      const pagos = parseFloat(nuevoProveedor.pagos) || 0;
       const pendiente = saldo - pagos;
 
       const docRef = await addDoc(collection(db, 'proveedores'), {
@@ -72,6 +104,7 @@ const TotalDeudas = () => {
       
       setNuevoProveedor({ nombre: '', saldo: '', pagos: '', pendiente: '' });
       setMostrarFormulario(false);
+      setErrores({});
     } catch (error) {
       console.error('Error al agregar proveedor:', error);
     }
@@ -93,9 +126,17 @@ const TotalDeudas = () => {
   const actualizarProveedor = async (id) => {
     try {
       const proveedorActualizado = proveedores.find(p => p.id === id);
-      // Recalcular el pendiente antes de guardar
+      
+      // Validar pagos antes de actualizar
       const saldo = parseFloat(proveedorActualizado.saldo || 0);
       const pagos = parseFloat(proveedorActualizado.pagos || 0);
+      
+      const errorPagos = validarPagos(saldo, pagos);
+      if (errorPagos) {
+        alert(errorPagos);
+        return;
+      }
+      
       const pendiente = saldo - pagos;
       
       await updateDoc(doc(db, 'proveedores', id), {
@@ -114,6 +155,28 @@ const TotalDeudas = () => {
     } catch (error) {
       console.error('Error al actualizar proveedor:', error);
     }
+  };
+
+  // Manejar cambios en edición con validación
+  const manejarCambioEdicion = (id, campo, valor) => {
+    const nuevosProveedores = proveedores.map(p => 
+      p.id === id ? {...p, [campo]: valor} : p
+    );
+    
+    // Si estamos cambiando saldo o pagos, validar
+    if (campo === 'saldo' || campo === 'pagos') {
+      const proveedor = nuevosProveedores.find(p => p.id === id);
+      const saldo = parseFloat(proveedor.saldo || 0);
+      const pagos = parseFloat(proveedor.pagos || 0);
+      
+      // Si los pagos exceden el saldo, ajustar automáticamente
+      if (campo === 'pagos' && pagos > saldo) {
+        // No permitir que pagos sea mayor que saldo
+        return;
+      }
+    }
+    
+    setProveedores(nuevosProveedores);
   };
 
   // Filtrar proveedores por búsqueda
@@ -174,8 +237,15 @@ const TotalDeudas = () => {
               <input
                 type="text"
                 value={nuevoProveedor.nombre}
-                onChange={(e) => setNuevoProveedor({...nuevoProveedor, nombre: e.target.value})}
+                onChange={(e) => {
+                  setNuevoProveedor({...nuevoProveedor, nombre: e.target.value});
+                  if (e.target.value.trim()) {
+                    setErrores({...errores, nombre: null});
+                  }
+                }}
+                className={errores.nombre ? 'error' : ''}
               />
+              {errores.nombre && <span className="mensaje-error">{errores.nombre}</span>}
             </div>
             
             <div className="input-group">
@@ -183,8 +253,15 @@ const TotalDeudas = () => {
               <input
                 type="number"
                 step="0.01"
+                min="0"
                 value={nuevoProveedor.saldo}
-                onChange={(e) => setNuevoProveedor({...nuevoProveedor, saldo: e.target.value})}
+                onChange={(e) => {
+                  const valor = e.target.value;
+                  // No permitir valores negativos
+                  if (valor >= 0) {
+                    setNuevoProveedor({...nuevoProveedor, saldo: valor});
+                  }
+                }}
               />
             </div>
             
@@ -193,9 +270,21 @@ const TotalDeudas = () => {
               <input
                 type="number"
                 step="0.01"
+                min="0"
+                max={nuevoProveedor.saldo || 0}
                 value={nuevoProveedor.pagos}
-                onChange={(e) => setNuevoProveedor({...nuevoProveedor, pagos: e.target.value})}
+                onChange={(e) => {
+                  const valor = e.target.value;
+                  const saldo = parseFloat(nuevoProveedor.saldo) || 0;
+                  
+                  // No permitir que pagos sea mayor que saldo
+                  if (parseFloat(valor) <= saldo) {
+                    setNuevoProveedor({...nuevoProveedor, pagos: valor});
+                  }
+                }}
+                className={errores.pagos ? 'error' : ''}
               />
+              {errores.pagos && <span className="mensaje-error">{errores.pagos}</span>}
             </div>
             
             <div className="input-group">
@@ -244,10 +333,7 @@ const TotalDeudas = () => {
                         type="text"
                         value={proveedor.nombre}
                         onChange={(e) => {
-                          const nuevosProveedores = proveedores.map(p => 
-                            p.id === proveedor.id ? {...p, nombre: e.target.value} : p
-                          );
-                          setProveedores(nuevosProveedores);
+                          manejarCambioEdicion(proveedor.id, 'nombre', e.target.value);
                         }}
                       />
                     ) : (
@@ -262,12 +348,14 @@ const TotalDeudas = () => {
                       <input
                         type="number"
                         step="0.01"
+                        min="0"
                         value={proveedor.saldo}
                         onChange={(e) => {
-                          const nuevosProveedores = proveedores.map(p => 
-                            p.id === proveedor.id ? {...p, saldo: e.target.value} : p
-                          );
-                          setProveedores(nuevosProveedores);
+                          const valor = e.target.value;
+                          // No permitir valores negativos
+                          if (valor >= 0) {
+                            manejarCambioEdicion(proveedor.id, 'saldo', valor);
+                          }
                         }}
                       />
                     ) : (
@@ -281,12 +369,17 @@ const TotalDeudas = () => {
                       <input
                         type="number"
                         step="0.01"
+                        min="0"
+                        max={proveedor.saldo || 0}
                         value={proveedor.pagos}
                         onChange={(e) => {
-                          const nuevosProveedores = proveedores.map(p => 
-                            p.id === proveedor.id ? {...p, pagos: e.target.value} : p
-                          );
-                          setProveedores(nuevosProveedores);
+                          const valor = e.target.value;
+                          const saldo = parseFloat(proveedor.saldo) || 0;
+                          
+                          // No permitir que pagos sea mayor que saldo
+                          if (parseFloat(valor) <= saldo) {
+                            manejarCambioEdicion(proveedor.id, 'pagos', valor);
+                          }
                         }}
                       />
                     ) : (

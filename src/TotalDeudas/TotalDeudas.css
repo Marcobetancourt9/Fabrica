@@ -413,3 +413,26 @@ color: white !important;
   cursor: not-allowed;
   color: #666;
 }
+
+.mensaje-error {
+  color: #e74c3c;
+  font-size: 0.8rem;
+  margin-top: 5px;
+  display: block;
+}
+
+input.error {
+  border-color: #e74c3c;
+}
+
+input[type="number"] {
+  appearance: textfield;
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+}
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
