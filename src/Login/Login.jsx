@@ -106,7 +106,7 @@ function LoginForm() {
       <div className={styles.loginCard}>
         <div className={styles.logoContainer}>
           <img 
-            src="https://ppfmspwqiqawiiexaanb.supabase.co/storage/v1/object/public/imagenesoggi//oggi.png" 
+            src="https://cdn.builder.io/api/v1/image/assets/TEMP/3edde6bb0a5d03a5675a4386cedea6018b11ddde" 
             alt="Pincho Pan Fabrica" 
             className={styles.logo}
           />
