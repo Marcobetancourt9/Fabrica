@@ -43,56 +43,7 @@ const Inicio = () => {
         </div>
         <div className="hero-wave"></div>
       </section>
-
-      {/* Product Categories con imágenes */}
-      <section className="product-categories">
-        <h2 className="section-title">Nuestros Productos</h2>
-        <p className="section-subtitle">Calidad y estilo para tu visión</p>
-        
-        <div className="categories-grid">
-          <div className="category-card">
-            <div className="category-image" style={{ backgroundImage: `url(${monturasImg})` }}></div>
-            <div className="category-content">
-              <h3 className="category-title">Monturas</h3>
-              <p className="category-description">Las últimas tendencias en monturas para todos los estilos</p>
-              <button 
-                className="category-button"
-                onClick={() => handleCategoryClick('monturas')}
-              >
-                Comprar ahora
-              </button>
-            </div>
-          </div>
-
-          <div className="category-card">
-            <div className="category-image" style={{ backgroundImage: `url(${lentesContactoImg})` }}></div>
-            <div className="category-content">
-              <h3 className="category-title">Lentes de Contacto</h3>
-              <p className="category-description">Comodidad y claridad para tus ojos</p>
-              <button 
-                className="category-button"
-                onClick={() => handleCategoryClick('lentes-contacto')}
-              >
-                Comprar ahora
-              </button>
-            </div>
-          </div>
-
-          <div className="category-card">
-            <div className="category-image" style={{ backgroundImage: `url(${lentesSolImg})` }}></div>
-            <div className="category-content">
-              <h3 className="category-title">Lentes de sol</h3>
-              <p className="category-description">Protección UV con estilo</p>
-              <button 
-                className="category-button"
-                onClick={() => handleCategoryClick('lentes-sol')}
-              >
-                Comprar ahora
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
+      <br />
     </div>
   );
 };

@@ -15,7 +15,7 @@ const TotalDeudas = () => {
   const [editandoId, setEditandoId] = useState(null);
   const [cargando, setCargando] = useState(true);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
-  const [modoCalculoAutomatico, setModoCalculoAutomatico] = useState(true);
+  const [errores, setErrores] = useState({});
 
   // Cargar proveedores desde Firebase
   useEffect(() => {
@@ -37,28 +37,55 @@ const TotalDeudas = () => {
     cargarProveedores();
   }, []);
 
+  // Validar que los pagos no excedan el saldo
+  const validarPagos = (saldo, pagos) => {
+    const saldoNum = parseFloat(saldo) || 0;
+    const pagosNum = parseFloat(pagos) || 0;
+    
+    if (pagosNum > saldoNum) {
+      return "Los pagos no pueden ser mayores al saldo";
+    }
+    return null;
+  };
+
   // Calcular saldo pendiente automáticamente
   useEffect(() => {
-    if (modoCalculoAutomatico && nuevoProveedor.saldo && nuevoProveedor.pagos) {
-      const saldo = parseFloat(nuevoProveedor.saldo) || 0;
-      const pagos = parseFloat(nuevoProveedor.pagos) || 0;
-      setNuevoProveedor({
-        ...nuevoProveedor,
-        pendiente: (saldo - pagos).toFixed(2)
-      });
+    const saldo = parseFloat(nuevoProveedor.saldo) || 0;
+    const pagos = parseFloat(nuevoProveedor.pagos) || 0;
+    
+    // Validar pagos
+    const errorPagos = validarPagos(saldo, pagos);
+    if (errorPagos) {
+      setErrores({...errores, pagos: errorPagos});
+    } else {
+      setErrores({...errores, pagos: null});
     }
-  }, [nuevoProveedor.saldo, nuevoProveedor.pagos, modoCalculoAutomatico]);
+    
+    setNuevoProveedor({
+      ...nuevoProveedor,
+      pendiente: (saldo - pagos).toFixed(2)
+    });
+  }, [nuevoProveedor.saldo, nuevoProveedor.pagos]);
 
   // Agregar nuevo proveedor
   const agregarProveedor = async () => {
-    if (!nuevoProveedor.nombre.trim()) return;
+    if (!nuevoProveedor.nombre.trim()) {
+      setErrores({...errores, nombre: "El nombre es obligatorio"});
+      return;
+    }
+    
+    const saldo = parseFloat(nuevoProveedor.saldo) || 0;
+    const pagos = parseFloat(nuevoProveedor.pagos) || 0;
+    
+    // Validar pagos antes de agregar
+    const errorPagos = validarPagos(saldo, pagos);
+    if (errorPagos) {
+      setErrores({...errores, pagos: errorPagos});
+      return;
+    }
     
     try {
-      const saldo = parseFloat(nuevoProveedor.saldo) || 0;
-      const pagos = parseFloat(nuevoProveedor.pagos) || 0;
-      const pendiente = modoCalculoAutomatico 
-        ? saldo - pagos 
-        : parseFloat(nuevoProveedor.pendiente) || 0;
+      const pendiente = saldo - pagos;
 
       const docRef = await addDoc(collection(db, 'proveedores'), {
         nombre: nuevoProveedor.nombre,
@@ -77,6 +104,7 @@ const TotalDeudas = () => {
       
       setNuevoProveedor({ nombre: '', saldo: '', pagos: '', pendiente: '' });
       setMostrarFormulario(false);
+      setErrores({});
     } catch (error) {
       console.error('Error al agregar proveedor:', error);
     }
@@ -98,16 +126,57 @@ const TotalDeudas = () => {
   const actualizarProveedor = async (id) => {
     try {
       const proveedorActualizado = proveedores.find(p => p.id === id);
+      
+      // Validar pagos antes de actualizar
+      const saldo = parseFloat(proveedorActualizado.saldo || 0);
+      const pagos = parseFloat(proveedorActualizado.pagos || 0);
+      
+      const errorPagos = validarPagos(saldo, pagos);
+      if (errorPagos) {
+        alert(errorPagos);
+        return;
+      }
+      
+      const pendiente = saldo - pagos;
+      
       await updateDoc(doc(db, 'proveedores', id), {
         nombre: proveedorActualizado.nombre,
-        saldo: parseFloat(proveedorActualizado.saldo || 0),
-        pagos: parseFloat(proveedorActualizado.pagos || 0),
-        pendiente: parseFloat(proveedorActualizado.pendiente || 0)
+        saldo: saldo,
+        pagos: pagos,
+        pendiente: pendiente
       });
+      
+      // Actualizar el estado local con el pendiente recalculado
+      setProveedores(proveedores.map(p => 
+        p.id === id ? {...p, pendiente: pendiente} : p
+      ));
+      
       setEditandoId(null);
     } catch (error) {
       console.error('Error al actualizar proveedor:', error);
     }
+  };
+
+  // Manejar cambios en edición con validación
+  const manejarCambioEdicion = (id, campo, valor) => {
+    const nuevosProveedores = proveedores.map(p => 
+      p.id === id ? {...p, [campo]: valor} : p
+    );
+    
+    // Si estamos cambiando saldo o pagos, validar
+    if (campo === 'saldo' || campo === 'pagos') {
+      const proveedor = nuevosProveedores.find(p => p.id === id);
+      const saldo = parseFloat(proveedor.saldo || 0);
+      const pagos = parseFloat(proveedor.pagos || 0);
+      
+      // Si los pagos exceden el saldo, ajustar automáticamente
+      if (campo === 'pagos' && pagos > saldo) {
+        // No permitir que pagos sea mayor que saldo
+        return;
+      }
+    }
+    
+    setProveedores(nuevosProveedores);
   };
 
   // Filtrar proveedores por búsqueda
@@ -131,6 +200,7 @@ const TotalDeudas = () => {
 
   return (
     <div className="total-deudas-container">
+      <br />
       <header className="app-header">
         <h1>💰 Control de Deudas con Proveedores</h1>
         <p>Gestiona los saldos y pagos a tus proveedores</p>
@@ -161,25 +231,21 @@ const TotalDeudas = () => {
         <div className="formulario-proveedor">
           <h2>Agregar Nuevo Proveedor</h2>
           
-          <div className="modo-calculo">
-            <label>
-              <input
-                type="checkbox"
-                checked={modoCalculoAutomatico}
-                onChange={() => setModoCalculoAutomatico(!modoCalculoAutomatico)}
-              />
-              Calcular saldo pendiente automáticamente
-            </label>
-          </div>
-          
           <div className="campos-formulario">
             <div className="input-group">
               <label>Nombre del proveedor</label>
               <input
                 type="text"
                 value={nuevoProveedor.nombre}
-                onChange={(e) => setNuevoProveedor({...nuevoProveedor, nombre: e.target.value})}
+                onChange={(e) => {
+                  setNuevoProveedor({...nuevoProveedor, nombre: e.target.value});
+                  if (e.target.value.trim()) {
+                    setErrores({...errores, nombre: null});
+                  }
+                }}
+                className={errores.nombre ? 'error' : ''}
               />
+              {errores.nombre && <span className="mensaje-error">{errores.nombre}</span>}
             </div>
             
             <div className="input-group">
@@ -187,8 +253,15 @@ const TotalDeudas = () => {
               <input
                 type="number"
                 step="0.01"
+                min="0"
                 value={nuevoProveedor.saldo}
-                onChange={(e) => setNuevoProveedor({...nuevoProveedor, saldo: e.target.value})}
+                onChange={(e) => {
+                  const valor = e.target.value;
+                  // No permitir valores negativos
+                  if (valor >= 0) {
+                    setNuevoProveedor({...nuevoProveedor, saldo: valor});
+                  }
+                }}
               />
             </div>
             
@@ -197,10 +270,21 @@ const TotalDeudas = () => {
               <input
                 type="number"
                 step="0.01"
+                min="0"
+                max={nuevoProveedor.saldo || 0}
                 value={nuevoProveedor.pagos}
-                onChange={(e) => setNuevoProveedor({...nuevoProveedor, pagos: e.target.value})}
-                disabled={!modoCalculoAutomatico}
+                onChange={(e) => {
+                  const valor = e.target.value;
+                  const saldo = parseFloat(nuevoProveedor.saldo) || 0;
+                  
+                  // No permitir que pagos sea mayor que saldo
+                  if (parseFloat(valor) <= saldo) {
+                    setNuevoProveedor({...nuevoProveedor, pagos: valor});
+                  }
+                }}
+                className={errores.pagos ? 'error' : ''}
               />
+              {errores.pagos && <span className="mensaje-error">{errores.pagos}</span>}
             </div>
             
             <div className="input-group">
@@ -209,8 +293,8 @@ const TotalDeudas = () => {
                 type="number"
                 step="0.01"
                 value={nuevoProveedor.pendiente}
-                onChange={(e) => setNuevoProveedor({...nuevoProveedor, pendiente: e.target.value})}
-                disabled={modoCalculoAutomatico}
+                readOnly
+                className="campo-solo-lectura"
               />
             </div>
             
@@ -249,10 +333,7 @@ const TotalDeudas = () => {
                         type="text"
                         value={proveedor.nombre}
                         onChange={(e) => {
-                          const nuevosProveedores = proveedores.map(p => 
-                            p.id === proveedor.id ? {...p, nombre: e.target.value} : p
-                          );
-                          setProveedores(nuevosProveedores);
+                          manejarCambioEdicion(proveedor.id, 'nombre', e.target.value);
                         }}
                       />
                     ) : (
@@ -267,12 +348,14 @@ const TotalDeudas = () => {
                       <input
                         type="number"
                         step="0.01"
+                        min="0"
                         value={proveedor.saldo}
                         onChange={(e) => {
-                          const nuevosProveedores = proveedores.map(p => 
-                            p.id === proveedor.id ? {...p, saldo: e.target.value} : p
-                          );
-                          setProveedores(nuevosProveedores);
+                          const valor = e.target.value;
+                          // No permitir valores negativos
+                          if (valor >= 0) {
+                            manejarCambioEdicion(proveedor.id, 'saldo', valor);
+                          }
                         }}
                       />
                     ) : (
@@ -286,12 +369,17 @@ const TotalDeudas = () => {
                       <input
                         type="number"
                         step="0.01"
+                        min="0"
+                        max={proveedor.saldo || 0}
                         value={proveedor.pagos}
                         onChange={(e) => {
-                          const nuevosProveedores = proveedores.map(p => 
-                            p.id === proveedor.id ? {...p, pagos: e.target.value} : p
-                          );
-                          setProveedores(nuevosProveedores);
+                          const valor = e.target.value;
+                          const saldo = parseFloat(proveedor.saldo) || 0;
+                          
+                          // No permitir que pagos sea mayor que saldo
+                          if (parseFloat(valor) <= saldo) {
+                            manejarCambioEdicion(proveedor.id, 'pagos', valor);
+                          }
                         }}
                       />
                     ) : (
@@ -301,23 +389,9 @@ const TotalDeudas = () => {
                     )}
                   </td>
                   <td>
-                    {editandoId === proveedor.id ? (
-                      <input
-                        type="number"
-                        step="0.01"
-                        value={proveedor.pendiente}
-                        onChange={(e) => {
-                          const nuevosProveedores = proveedores.map(p => 
-                            p.id === proveedor.id ? {...p, pendiente: e.target.value} : p
-                          );
-                          setProveedores(nuevosProveedores);
-                        }}
-                      />
-                    ) : (
-                      <span className={`monto ${parseFloat(proveedor.pendiente || 0) > 0 ? 'saldo-pendiente' : 'saldo-cero'}`}>
-                        ${parseFloat(proveedor.pendiente || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </span>
-                    )}
+                    <span className={`monto ${parseFloat(proveedor.pendiente || 0) > 0 ? 'saldo-pendiente' : 'saldo-cero'}`}>
+                      ${parseFloat(proveedor.pendiente || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
                   </td>
                   <td>
                     <div className="acciones">

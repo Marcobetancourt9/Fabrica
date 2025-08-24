@@ -20,6 +20,7 @@
   margin: 0;
   font-size: 28px;
   font-weight: 600;
+  color: white
 }
 
 .app-header p {
@@ -184,7 +185,7 @@
 
 .tabla-proveedores th {
   background: linear-gradient(135deg, #4a6491 0%, #2c3e50 100%);
-  color: white;
+color: white !important;
   padding: 16px;
   text-align: left;
   font-weight: 600;
@@ -406,4 +407,32 @@
   .acciones {
     flex-wrap: wrap;
   }
+}
+.campo-solo-lectura {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  color: #666;
+}
+
+.mensaje-error {
+  color: #e74c3c;
+  font-size: 0.8rem;
+  margin-top: 5px;
+  display: block;
+}
+
+input.error {
+  border-color: #e74c3c;
+}
+
+input[type="number"] {
+  appearance: textfield;
+  -webkit-appearance: none;
+  -moz-appearance: textfield;
+}
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
