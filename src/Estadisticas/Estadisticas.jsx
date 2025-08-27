@@ -275,16 +275,22 @@ const Estadisticas = () => {
                 const alturaPagos = (parseFloat(proveedor.pagos || 0) / maxValor) * 100;
                 
                 return (
-                  <div key={proveedor.id} className="barras-comparativas">
-                    <div className="barra-comparativa-container">
-                      <div className="barra-comparativa-etiqueta">{proveedor.nombre}</div>
-                      <div className="barras-dobles">
+                  <div key={proveedor.id} className="barra-comparativa-container">
+                    <div className="barra-comparativa-etiqueta">{proveedor.nombre}</div>
+                    <div className="barras-dobles">
+                      <div className="barra-comparativa-group">
+                        <div className="barra-label">Saldo</div>
+                        <br />
                         <div 
                           className="barra-comparativa saldo"
                           style={{ height: `${alturaSaldo}%` }}
                         >
                           <span className="valor-barra">${parseFloat(proveedor.saldo || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
                         </div>
+                      </div>
+                      <div className="barra-comparativa-group">
+                        <div className="barra-label">Pagos</div>
+                        <br />
                         <div 
                           className="barra-comparativa pago"
                           style={{ height: `${alturaPagos}%` }}

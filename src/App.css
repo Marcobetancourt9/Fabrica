@@ -436,10 +436,6 @@ label {
     border-radius: var(--border-radius-sm);
   }
   
-  button {
-    width: 100%;
-    justify-content: center;
-  }
   
   .mobile-stack > * + * {
     margin-top: var(--spacing-md);
