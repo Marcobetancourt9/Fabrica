@@ -11,7 +11,7 @@
 
 .app-header {
   background: linear-gradient(135deg, #2c3e50 0%, #4a6491 100%);
-  color: white;
+  color: #fff !important;
   padding: 25px;
   border-radius: 12px;
   margin-bottom: 25px;
@@ -22,6 +22,7 @@
   margin: 0;
   font-size: 28px;
   font-weight: 600;
+  color: #fff !important;
 }
 
 .app-header p {
