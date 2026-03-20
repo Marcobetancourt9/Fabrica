@@ -1,407 +1,348 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../../credentials';
-import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit as limitFirestore } from 'firebase/firestore';
+import { 
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
+  PieChart, Pie, Cell, LineChart, Line 
+} from 'recharts';
 import './Estadisticas.css';
 
 const Estadisticas = () => {
-  const [proveedoresTop, setProveedoresTop] = useState([]);
+  const [proveedoresData, setProveedoresData] = useState([]);
   const [cargando, setCargando] = useState(true);
-  const [periodo, setPeriodo] = useState('mes'); // 'mes', 'trimestre', 'año'
-  const [tipoGrafica, setTipoGrafica] = useState('barras'); // 'barras', 'tarta', 'lineas'
+  const [periodo, setPeriodo] = useState('mes');
+  const [tipoGrafica, setTipoGrafica] = useState('barras');
+  const [limite, setLimite] = useState(5);
+  const [paginaActual, setPaginaActual] = useState(1);
+  const itemsPorPagina = 10;
 
-  // Cargar los 5 proveedores con mayor saldo desde Firebase
   useEffect(() => {
-    const cargarProveedoresTop = async () => {
+    const cargarProveedores = async () => {
+      setCargando(true);
       try {
-        const q = query(
-          collection(db, 'proveedores'), 
-          orderBy('saldo', 'desc'), 
-          limit(5)
-        );
+        const q = limite === 'todos' 
+          ? query(collection(db, 'proveedores'), orderBy('saldo', 'desc'))
+          : query(collection(db, 'proveedores'), orderBy('saldo', 'desc'), limitFirestore(limite));
         
         const querySnapshot = await getDocs(q);
-        const proveedoresData = [];
+        const data = [];
         
         querySnapshot.forEach((doc) => {
-          proveedoresData.push({ id: doc.id, ...doc.data() });
+          data.push({ id: doc.id, ...doc.data() });
         });
         
-        setProveedoresTop(proveedoresData);
-        setCargando(false);
+        setProveedoresData(data);
       } catch (error) {
         console.error('Error al cargar proveedores:', error);
+      } finally {
         setCargando(false);
       }
     };
 
-    cargarProveedoresTop();
-  }, []);
+    cargarProveedores();
+  }, [limite]);
 
-  // Calcular totales
-  const totalSaldoTop = proveedoresTop.reduce((total, proveedor) => total + parseFloat(proveedor.saldo || 0), 0);
-  const totalPagosTop = proveedoresTop.reduce((total, proveedor) => total + parseFloat(proveedor.pagos || 0), 0);
-  const totalPendienteTop = proveedoresTop.reduce((total, proveedor) => total + parseFloat(proveedor.pendiente || 0), 0);
+  const totalSaldoTop = useMemo(() => proveedoresData.reduce((acc, p) => acc + parseFloat(p.saldo || 0), 0), [proveedoresData]);
+  const totalPagosTop = useMemo(() => proveedoresData.reduce((acc, p) => acc + parseFloat(p.pagos || 0), 0), [proveedoresData]);
+  const totalPendienteTop = useMemo(() => proveedoresData.reduce((acc, p) => acc + parseFloat(p.pendiente || 0), 0), [proveedoresData]);
 
-  // Colores para las gráficas
-  const colores = ['#4a6491', '#2c3e50', '#3498db', '#2ecc71', '#f39c12', '#e74c3c', '#9b59b6'];
-  
-  if (cargando) {
+  // Transform data for recharts
+  const chartData = useMemo(() => {
+    return proveedoresData.map(p => ({
+      name: p.nombre,
+      saldo: parseFloat(p.saldo || 0),
+      pagos: parseFloat(p.pagos || 0),
+      pendiente: parseFloat(p.pendiente || 0),
+    }));
+  }, [proveedoresData]);
+
+  // Format currency
+  const formatCurrency = (value) => {
+    return `$${new Intl.NumberFormat('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value)}`;
+  };
+  const formatPercentage = (value) => `${value.toFixed(1)}%`;
+
+  const colores = ['#4a6491', '#2c3e50', '#3498db', '#2ecc71', '#f39c12', '#e74c3c', '#9b59b6', '#1abc9c', '#95a5a6', '#d35400'];
+
+  // Pagination for table
+  const totalPaginas = Math.ceil(proveedoresData.length / itemsPorPagina);
+  const proveedoresPaginados = proveedoresData.slice(
+    (paginaActual - 1) * itemsPorPagina,
+    paginaActual * itemsPorPagina
+  );
+
+  const customTooltip = ({ active, payload, label }) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="custom-tooltip">
+          <p className="label-bold">{`${label}`}</p>
+          {payload.map((entry, index) => (
+            <p key={`item-${index}`} style={{ color: entry.color }}>
+              {`${entry.name}: ${formatCurrency(entry.value)}`}
+            </p>
+          ))}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  if (cargando && proveedoresData.length === 0) {
     return (
       <div className="cargando-container">
         <div className="cargando-spinner"></div>
-        <p>Cargando estadísticas...</p>
+        <p>Cargando estadísticas de alto rendimiento...</p>
       </div>
     );
   }
 
   return (
     <div className="estadisticas-container">
-      <header className="app-header">
-        <h1>📊 Dashboard de Estadísticas</h1>
-        <p>Top 5 proveedores con mayor saldo - Análisis detallado</p>
+      <header className="app-header responsive-header">
+        <div className="header-content">
+          <h1>📊 Panel Estadístico Avanzado</h1>
+          <p>Análisis en tiempo real de saldos, pagos y obligaciones</p>
+        </div>
       </header>
 
-      {/* Filtros de período */}
+      {/* Controles: Límite, Período, Gráficas */}
       <div className="filtros-container">
-        <div className="filtros-periodo">
-          <h2>Filtrar por período:</h2>
-          <div className="botones-periodo">
-            <button 
-              className={periodo === 'mes' ? 'btn-periodo activo' : 'btn-periodo'}
-              onClick={() => setPeriodo('mes')}
-            >
-              Este Mes
-            </button>
-            <button 
-              className={periodo === 'trimestre' ? 'btn-periodo activo' : 'btn-periodo'}
-              onClick={() => setPeriodo('trimestre')}
-            >
-              Este Trimestre
-            </button>
-            <button 
-              className={periodo === 'año' ? 'btn-periodo activo' : 'btn-periodo'}
-              onClick={() => setPeriodo('año')}
-            >
-              Este Año
-            </button>
-          </div>
-        </div>
-
-        <div className="filtros-graficas">
-          <h2>Tipo de gráfica:</h2>
-          <div className="botones-graficas">
-            <button 
-              className={tipoGrafica === 'barras' ? 'btn-grafica activo' : 'btn-grafica'}
-              onClick={() => setTipoGrafica('barras')}
-            >
-              Barras
-            </button>
-            <button 
-              className={tipoGrafica === 'tarta' ? 'btn-grafica activo' : 'btn-grafica'}
-              onClick={() => setTipoGrafica('tarta')}
-            >
-              Tarta
-            </button>
-            <button 
-              className={tipoGrafica === 'lineas' ? 'btn-grafica activo' : 'btn-grafica'}
-              onClick={() => setTipoGrafica('lineas')}
-            >
-              Líneas
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Tarjetas de resumen */}
-      <div className="resumen-cards">
-        <div className="resumen-card">
-          <div className="resumen-icono">💰</div>
-          <div className="resumen-info">
-            <h3>Saldo Total Top 5</h3>
-            <p className="resumen-monto">${totalSaldoTop.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-            <p className="resumen-tendencia positivo">+2.5% vs mes anterior</p>
-          </div>
-        </div>
-
-        <div className="resumen-card">
-          <div className="resumen-icono">💸</div>
-          <div className="resumen-info">
-            <h3>Pagos Total Top 5</h3>
-            <p className="resumen-monto">${totalPagosTop.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-            <p className="resumen-tendencia positivo">+5.1% vs mes anterior</p>
-          </div>
-        </div>
-
-        <div className="resumen-card">
-          <div className="resumen-icono">📉</div>
-          <div className="resumen-info">
-            <h3>Saldo Pendiente Top 5</h3>
-            <p className="resumen-monto pendiente">${totalPendienteTop.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-            <p className="resumen-tendencia negativo">-3.2% vs mes anterior</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Gráficas */}
-      <div className="graficas-container">
-        <div className="grafica-principal">
-          <h2>Distribución de Saldos por Proveedor</h2>
-          
-          {tipoGrafica === 'barras' && (
-            <div className="grafico-barras">
-              {proveedoresTop.map((proveedor, index) => {
-                const maxSaldo = Math.max(...proveedoresTop.map(p => parseFloat(p.saldo || 0)));
-                const altura = (parseFloat(proveedor.saldo || 0) / maxSaldo) * 100;
-                
-                return (
-                  <div key={proveedor.id} className="barra-container">
-                    <div className="barra-etiqueta">{proveedor.nombre}</div>
-                    <div className="barra">
-                      <div 
-                        className="barra-progreso" 
-                        style={{ 
-                          height: `${altura}%`,
-                          backgroundColor: colores[index % colores.length]
-                        }}
-                      >
-                        <span className="barra-valor">
-                          ${parseFloat(proveedor.saldo || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="barra-info">
-                      <p>Pagos: ${parseFloat(proveedor.pagos || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                      <p>Pendiente: ${parseFloat(proveedor.pendiente || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {tipoGrafica === 'tarta' && (
-            <div className="grafico-tarta-container">
-              <div className="grafico-tarta">
-                {proveedoresTop.map((proveedor, index) => {
-                  const porcentaje = (parseFloat(proveedor.saldo || 0) / totalSaldoTop) * 100;
-                  const offset = proveedoresTop.slice(0, index).reduce((acc, p) => acc + (parseFloat(p.saldo || 0) / totalSaldoTop) * 100, 0);
-                  
-                  return (
-                    <div 
-                      key={proveedor.id}
-                      className="sector-tarta"
-                      style={{
-                        backgroundColor: colores[index % colores.length],
-                        transform: `rotate(${offset * 3.6}deg)`,
-                        clipPath: `conic-gradient(from 0deg at 50% 50%, ${colores[index % colores.length]} 0% ${porcentaje}%, transparent ${porcentaje}% 100%)`
-                      }}
-                    ></div>
-                  );
-                })}
-                <div className="centro-tarta">
-                  <span>Total<br/>${totalSaldoTop.toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-                </div>
-              </div>
-              <div className="leyenda-tarta">
-                {proveedoresTop.map((proveedor, index) => (
-                  <div key={proveedor.id} className="item-leyenda">
-                    <div className="color-leyenda" style={{ backgroundColor: colores[index % colores.length] }}></div>
-                    <span className="nombre-leyenda">{proveedor.nombre}</span>
-                    <span className="valor-leyenda">
-                      ${parseFloat(proveedor.saldo || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} 
-                      ({(parseFloat(proveedor.saldo || 0) / totalSaldoTop * 100).toFixed(1)}%)
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {tipoGrafica === 'lineas' && (
-            <div className="grafico-lineas">
-              <div className="eje-y">
-                <span>${Math.max(...proveedoresTop.map(p => parseFloat(p.saldo || 0))).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-                <span>${(Math.max(...proveedoresTop.map(p => parseFloat(p.saldo || 0))) / 2).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-                <span>$0</span>
-              </div>
-              <div className="lineas-container">
-                {proveedoresTop.map((proveedor, index) => {
-                  const maxSaldo = Math.max(...proveedoresTop.map(p => parseFloat(p.saldo || 0)));
-                  const altura = (parseFloat(proveedor.saldo || 0) / maxSaldo) * 100;
-                  
-                  return (
-                    <div key={proveedor.id} className="linea-data">
-                      <div 
-                        className="punto-linea"
-                        style={{ 
-                          bottom: `${altura}%`,
-                          backgroundColor: colores[index % colores.length]
-                        }}
-                      >
-                        <div className="tooltip-linea">
-                          {proveedor.nombre}: ${parseFloat(proveedor.saldo || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </div>
-                      </div>
-                      <div 
-                        className="linea"
-                        style={{ 
-                          height: `${altura}%`,
-                          backgroundColor: colores[index % colores.length]
-                        }}
-                      ></div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="eje-x">
-                {proveedoresTop.map((proveedor, index) => (
-                  <span key={proveedor.id} className="etiqueta-eje-x">{proveedor.nombre}</span>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div className="graficas-secundarias">
-          <div className="grafica-secundaria">
-            <h3>Comparación Saldo vs Pagos</h3>
-            <div className="grafico-comparativo">
-              {proveedoresTop.map((proveedor, index) => {
-                const maxValor = Math.max(
-                  ...proveedoresTop.map(p => parseFloat(p.saldo || 0)),
-                  ...proveedoresTop.map(p => parseFloat(p.pagos || 0))
-                );
-                const alturaSaldo = (parseFloat(proveedor.saldo || 0) / maxValor) * 100;
-                const alturaPagos = (parseFloat(proveedor.pagos || 0) / maxValor) * 100;
-                
-                return (
-                  <div key={proveedor.id} className="barra-comparativa-container">
-                    <div className="barra-comparativa-etiqueta">{proveedor.nombre}</div>
-                    <div className="barras-dobles">
-                      <div className="barra-comparativa-group">
-                        <div className="barra-label">Saldo</div>
-                        <br />
-                        <div 
-                          className="barra-comparativa saldo"
-                          style={{ height: `${alturaSaldo}%` }}
-                        >
-                          <span className="valor-barra">${parseFloat(proveedor.saldo || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-                        </div>
-                      </div>
-                      <div className="barra-comparativa-group">
-                        <div className="barra-label">Pagos</div>
-                        <br />
-                        <div 
-                          className="barra-comparativa pago"
-                          style={{ height: `${alturaPagos}%` }}
-                        >
-                          <span className="valor-barra">${parseFloat(proveedor.pagos || 0).toLocaleString('es-ES', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="grafica-secundaria">
-            <h3>Porcentaje de Saldo Pendiente</h3>
-            <div className="grafico-circular-mini">
-              {proveedoresTop.map((proveedor, index) => {
-                const porcentajePendiente = (parseFloat(proveedor.pendiente || 0) / parseFloat(proveedor.saldo || 1)) * 100;
-                
-                return (
-                  <div key={proveedor.id} className="circular-mini-container">
-                    <div className="circular-mini">
-                      <div 
-                        className="circular-mini-progreso"
-                        style={{ 
-                          background: `conic-gradient(
-                            ${colores[index % colores.length]} 0% ${porcentajePendiente}%, 
-                            #f0f2f5 ${porcentajePendiente}% 100%
-                          )`
-                        }}
-                      ></div>
-                      <div className="circular-mini-texto">
-                        <span>{porcentajePendiente.toFixed(0)}%</span>
-                      </div>
-                    </div>
-                    <div className="circular-mini-info">
-                      <span className="circular-mini-nombre">{proveedor.nombre}</span>
-                      <span className="circular-mini-valor">${parseFloat(proveedor.pendiente || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Tabla detallada */}
-      <div className="tabla-container">
-        <h2>Detalle de los 5 Proveedores con Mayor Saldo</h2>
-        <table className="tabla-proveedores">
-          <thead>
-            <tr>
-              <th>Posición</th>
-              <th>Proveedor</th>
-              <th>Saldo ($)</th>
-              <th>Pagos ($)</th>
-              <th>Saldo Pendiente ($)</th>
-              <th>Porcentaje del Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {proveedoresTop.map((proveedor, index) => (
-              <tr key={proveedor.id}>
-                <td>
-                  <div className={`posicion posicion-${index + 1}`}>
-                    #{index + 1}
-                  </div>
-                </td>
-                <td>
-                  <div className="nombre-proveedor">
-                    <span className="avatar">{proveedor.nombre.charAt(0).toUpperCase()}</span>
-                    {proveedor.nombre}
-                  </div>
-                </td>
-                <td>
-                  <span className="monto positivo">
-                    ${parseFloat(proveedor.saldo || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </td>
-                <td>
-                  <span className="monto negativo">
-                    ${parseFloat(proveedor.pagos || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </td>
-                <td>
-                  <span className={`monto ${parseFloat(proveedor.pendiente || 0) > 0 ? 'saldo-pendiente' : 'saldo-cero'}`}>
-                    ${parseFloat(proveedor.pendiente || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </td>
-                <td>
-                  <div className="porcentaje-container">
-                    <div className="porcentaje-barra">
-                      <div 
-                        className="porcentaje-progreso" 
-                        style={{ 
-                          width: `${(parseFloat(proveedor.saldo || 0) / totalSaldoTop) * 100}%`,
-                          backgroundColor: colores[index % colores.length]
-                        }}
-                      ></div>
-                    </div>
-                    <span className="porcentaje-texto">
-                      {((parseFloat(proveedor.saldo || 0) / totalSaldoTop) * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                </td>
-              </tr>
+        <div className="filtro-card glass-panel">
+          <h2>Mostrar Proveedores:</h2>
+          <div className="botones-limite">
+            {[5, 10, 25, 50, 'todos'].map((lim) => (
+              <button 
+                key={lim}
+                className={`btn-filtro ${limite === lim ? 'activo' : ''}`}
+                onClick={() => setLimite(lim)}
+              >
+                {lim === 'todos' ? 'Todos' : `Top ${lim}`}
+              </button>
             ))}
-          </tbody>
-        </table>
+          </div>
+        </div>
+
+        <div className="filtro-card glass-panel">
+          <h2>Tipo de visualización:</h2>
+          <div className="botones-graficas">
+            {['barras', 'tarta', 'lineas'].map((tipo) => (
+              <button 
+                key={tipo}
+                className={`btn-filtro ${tipoGrafica === tipo ? 'activo' : ''}`}
+                onClick={() => setTipoGrafica(tipo)}
+              >
+                {tipo.charAt(0).toUpperCase() + tipo.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Tarjetas KPI */}
+      <div className="kpi-grid">
+        <div className="kpi-card glass-panel">
+          <div className="kpi-icon primary-bg">💰</div>
+          <div className="kpi-content">
+            <h3>Saldo Total {limite !== 'todos' ? `Top ${limite}` : ''}</h3>
+            <h2>{formatCurrency(totalSaldoTop)}</h2>
+            <span className="trend positive">+2.5% mes actual</span>
+          </div>
+        </div>
+        <div className="kpi-card glass-panel">
+          <div className="kpi-icon success-bg">💸</div>
+          <div className="kpi-content">
+            <h3>Pagos Realizados</h3>
+            <h2>{formatCurrency(totalPagosTop)}</h2>
+            <span className="trend positive">+5.1% mes actual</span>
+          </div>
+        </div>
+        <div className="kpi-card glass-panel">
+          <div className="kpi-icon warning-bg">📉</div>
+          <div className="kpi-content">
+            <h3>Deuda Pendiente</h3>
+            <h2 className="text-warning">{formatCurrency(totalPendienteTop)}</h2>
+            <span className="trend negative">-1.2% mes actual</span>
+          </div>
+        </div>
+      </div>
+
+      {cargando && <div className="cargando-spinner-small"></div>}
+
+      {/* Recharts - Gráfica Principal */}
+      <div className="chart-main-card glass-panel fade-in">
+        <h2>Distribución de Saldos por Proveedor</h2>
+        <div className="chart-wrapper">
+          <ResponsiveContainer width="100%" height={400}>
+            {tipoGrafica === 'barras' ? (
+              <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} tick={{ fill: '#64748b', fontSize: 12 }} />
+                <YAxis tickFormatter={(val) => `$${val/1000}k`} tick={{ fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <RechartsTooltip content={customTooltip} cursor={{ fill: '#f1f5f9' }} />
+                <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                <Bar dataKey="saldo" name="Saldo Actual" fill="#4a6491" radius={[4, 4, 0, 0]} animationDuration={1000}>
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={colores[index % colores.length]} />
+                  ))}
+                </Bar>
+              </BarChart>
+            ) : tipoGrafica === 'tarta' ? (
+              <PieChart>
+                <RechartsTooltip content={customTooltip} />
+                <Legend layout="horizontal" verticalAlign="bottom" align="center" wrapperStyle={{ paddingTop: '20px' }} />
+                <Pie
+                  data={chartData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={80}
+                  outerRadius={140}
+                  paddingAngle={2}
+                  dataKey="saldo"
+                  animationDuration={1000}
+                >
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={colores[index % colores.length]} />
+                  ))}
+                </Pie>
+              </PieChart>
+            ) : (
+              <LineChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                <XAxis dataKey="name" angle={-45} textAnchor="end" height={80} tick={{ fill: '#64748b', fontSize: 12 }} />
+                <YAxis tickFormatter={(val) => `$${val/1000}k`} tick={{ fill: '#64748b' }} axisLine={false} tickLine={false} />
+                <RechartsTooltip content={customTooltip} />
+                <Legend wrapperStyle={{ paddingTop: '20px' }} />
+                <Line type="monotone" dataKey="saldo" name="Saldo" stroke="#3b82f6" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 8 }} animationDuration={1000} />
+              </LineChart>
+            )}
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Gráficas Secundarias */}
+      <div className="graficas-secundarias-grid">
+        <div className="chart-sec-card glass-panel fade-in">
+          <h3>Comparación Saldo vs Pagos</h3>
+          <div style={{ width: '100%', height: 300 }}>
+            <ResponsiveContainer>
+              <BarChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="name" hide={chartData.length > 15} />
+                <YAxis tickFormatter={(val) => `$${val/1000}k`} width={60} />
+                <RechartsTooltip content={customTooltip} cursor={{ fill: '#f1f5f9' }} />
+                <Legend />
+                <Bar dataKey="saldo" name="Saldo" fill="#3b82f6" radius={[2, 2, 0, 0]} />
+                <Bar dataKey="pagos" name="Pagos" fill="#10b981" radius={[2, 2, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="chart-sec-card glass-panel fade-in">
+          <h3>Composición Deuda Pendiente</h3>
+          <div style={{ width: '100%', height: 300 }}>
+            <ResponsiveContainer>
+              <PieChart>
+                <RechartsTooltip content={customTooltip} />
+                <Pie data={chartData} cx="50%" cy="50%" outerRadius={100} dataKey="pendiente">
+                  {chartData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={colores[(index + 3) % colores.length]} />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabla Avanzada Responsiva */}
+      <div className="tabla-avanzada-card glass-panel fade-in">
+        <div className="tabla-header">
+          <h2>Detalles de Cuenta</h2>
+          <span className="badge-count">Total Listados: {proveedoresData.length}</span>
+        </div>
+        
+        <div className="tabla-responsive">
+          <table className="modern-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Proveedor</th>
+                <th className="text-right">Saldo Actual</th>
+                <th className="text-right">Pagos Realizados</th>
+                <th className="text-right">Deuda Pendiente</th>
+                <th>Participación %</th>
+              </tr>
+            </thead>
+            <tbody>
+              {proveedoresPaginados.map((p, index) => {
+                const absoluteIndex = (paginaActual - 1) * itemsPorPagina + index + 1;
+                const porcentaje = (parseFloat(p.saldo || 0) / totalSaldoTop) * 100 || 0;
+                
+                return (
+                  <tr key={p.id}>
+                    <td><span className="idx-badge">{absoluteIndex}</span></td>
+                    <td>
+                      <div className="prov-info">
+                        <div className="prov-avatar" style={{ backgroundColor: colores[absoluteIndex % colores.length] }}>
+                          {p.nombre.charAt(0).toUpperCase()}
+                        </div>
+                        <span className="prov-name">{p.nombre}</span>
+                      </div>
+                    </td>
+                    <td className="text-right font-bold text-primary">{formatCurrency(p.saldo || 0)}</td>
+                    <td className="text-right text-success">{formatCurrency(p.pagos || 0)}</td>
+                    <td className={`text-right font-medium ${parseFloat(p.pendiente || 0) > 0 ? 'text-warning' : 'text-neutral'}`}>
+                      {formatCurrency(p.pendiente || 0)}
+                    </td>
+                    <td>
+                      <div className="progress-bar-container">
+                        <div className="progress-bar-fill" style={{ width: `${porcentaje}%`, backgroundColor: colores[absoluteIndex % colores.length] }} />
+                        <span className="progress-text">{formatPercentage(porcentaje)}</span>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+              {proveedoresData.length === 0 && (
+                <tr>
+                  <td colSpan="6" className="text-center no-data">No se encontraron datos para mostrar.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Controles de Paginación */}
+        {totalPaginas > 1 && (
+          <div className="pagination">
+            <button 
+              disabled={paginaActual === 1} 
+              onClick={() => setPaginaActual(p => Math.max(1, p - 1))}
+              className="btn-page"
+            >
+              &laquo; Anterior
+            </button>
+            <div className="page-indicators">
+              {Array.from({ length: totalPaginas }, (_, i) => i + 1).map(page => (
+                <button 
+                  key={page} 
+                  className={`dot-page ${paginaActual === page ? 'active' : ''}`}
+                  onClick={() => setPaginaActual(page)}
+                >
+                  {page}
+                </button>
+              ))}
+            </div>
+            <button 
+              disabled={paginaActual === totalPaginas} 
+              onClick={() => setPaginaActual(p => Math.min(totalPaginas, p + 1))}
+              className="btn-page"
+            >
+              Siguiente &raquo;
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

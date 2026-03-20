@@ -13,7 +13,7 @@ import AuthBubble from './Loginbutton/Loginbutton';
 import TotalDeudas from './TotalDeudas/TotalDeudas.jsx';
 import Estadisticas from './Estadisticas/Estadisticas.jsx';
 import CuentasPorPagar from './CuentasPorPagar/CuentasPorPagar.jsx';
-
+import Pedidos from './Pedidos/Pedidos.jsx';
 export default function App() {
   const [scrolled, setScrolled] = useState(false);
 
@@ -47,6 +47,7 @@ export default function App() {
             <Route path="/deudas" element={<TotalDeudas />} />
             <Route path="/estadisticas" element={<Estadisticas />} />
             <Route path="/proveedores" element={<CuentasPorPagar />} />
+            <Route path="/pedidos" element={<Pedidos />} />
           </Routes> 
           </main>
         <Footer />

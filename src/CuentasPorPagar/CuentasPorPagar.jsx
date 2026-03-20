@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../credentials';
 import './CuentasPorPagar.css';
 
@@ -11,7 +11,7 @@ const CuentasPorPagar = () => {
   });
   const [filtro, setFiltro] = useState('');
   const [semanaFiltro, setSemanaFiltro] = useState('');
-  const [semanas, setSemanas] = useState(generarSemanas2025());
+  const [semanas, setSemanas] = useState([]);
   const [mostrarModal, setMostrarModal] = useState(false);
   const [nuevaSemana, setNuevaSemana] = useState({ inicio: '', fin: '' });
   const [editandoDeuda, setEditandoDeuda] = useState(null);
@@ -54,22 +54,39 @@ const CuentasPorPagar = () => {
     return semanas;
   }
 
-  // Cargar proveedores desde Firebase
+  // Cargar proveedores y semanas desde Firebase
   useEffect(() => {
-    const cargarProveedores = async () => {
+    const cargarTodo = async () => {
       try {
+        // Cargar proveedores
         const querySnapshot = await getDocs(collection(db, 'por_pagar'));
         const proveedoresData = [];
-        querySnapshot.forEach((doc) => {
-          proveedoresData.push({ id: doc.id, ...doc.data() });
+        querySnapshot.forEach((docSnap) => {
+          proveedoresData.push({ id: docSnap.id, ...docSnap.data() });
         });
         setProveedores(proveedoresData);
+
+        // Cargar semanas desde configuración
+        const configRef = doc(db, 'configuracion', 'semanas_por_pagar');
+        const configSnap = await getDoc(configRef);
+        
+        if (configSnap.exists()) {
+          setSemanas(configSnap.data().lista || []);
+        } else {
+          // Inicializar por primera vez con datos del 2025
+          const semanasIniciales = generarSemanas2025();
+          await setDoc(configRef, {
+            lista: semanasIniciales,
+            inicializado: true
+          });
+          setSemanas(semanasIniciales);
+        }
       } catch (error) {
-        console.error('Error cargando proveedores:', error);
+        console.error('Error cargando datos:', error);
       }
     };
 
-    cargarProveedores();
+    cargarTodo();
   }, []);
 
   // Agregar nuevo proveedor
@@ -115,28 +132,32 @@ const CuentasPorPagar = () => {
 
   // Eliminar semana
   const eliminarSemana = async (semanaKey) => {
-    if (window.confirm('¿Está seguro de que desea eliminar esta semana? Se eliminarán todos los datos asociados.')) {
+    if (window.confirm('¿Está seguro de que desea eliminar esta semana permanentemente? Se borrará de la base de datos.')) {
       const nuevasSemanas = semanas.filter(s => s.key !== semanaKey);
       setSemanas(nuevasSemanas);
       
-      // Actualizar todos los proveedores eliminando la semana
+      // Actualizar todos los proveedores localmente
       const proveedoresActualizados = proveedores.map(proveedor => ({
         ...proveedor,
         deudas: proveedor.deudas.filter(d => d.semana !== semanaKey)
       }));
-      
       setProveedores(proveedoresActualizados);
       
-      // Actualizar en Firebase
-      proveedoresActualizados.forEach(async (proveedor) => {
-        try {
+      try {
+        // Actualizar semanas persistentes en Firebase
+        await updateDoc(doc(db, 'configuracion', 'semanas_por_pagar'), {
+          lista: nuevasSemanas
+        });
+
+        // Actualizar proveedores en Firebase
+        proveedoresActualizados.forEach(async (proveedor) => {
           await updateDoc(doc(db, 'por_pagar', proveedor.id), {
             deudas: proveedor.deudas
           });
-        } catch (error) {
-          console.error('Error actualizando proveedor:', error);
-        }
-      });
+        });
+      } catch (error) {
+        console.error('Error sincronizando eliminación de semana:', error);
+      }
     }
   };
 
@@ -225,7 +246,7 @@ const CuentasPorPagar = () => {
   };
 
   // Agregar nueva semana
-  const agregarSemana = () => {
+  const agregarSemana = async () => {
     if (!nuevaSemana.inicio || !nuevaSemana.fin) {
       alert('Por favor ingrese ambas fechas');
       return;
@@ -264,15 +285,20 @@ const CuentasPorPagar = () => {
     setProveedores(proveedoresActualizados);
     
     // Actualizar en Firebase
-    proveedoresActualizados.forEach(async (proveedor) => {
-      try {
+    try {
+      // Registrar nueva semana en la BD global
+      await updateDoc(doc(db, 'configuracion', 'semanas_por_pagar'), {
+        lista: [...semanas, semana]
+      });
+
+      proveedoresActualizados.forEach(async (proveedor) => {
         await updateDoc(doc(db, 'por_pagar', proveedor.id), {
           deudas: proveedor.deudas
         });
-      } catch (error) {
-        console.error('Error actualizando proveedor:', error);
-      }
-    });
+      });
+    } catch (error) {
+      console.error('Error sincronizando adición de semana:', error);
+    }
     
     setNuevaSemana({ inicio: '', fin: '' });
     setMostrarModal(false);

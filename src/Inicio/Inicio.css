@@ -145,7 +145,7 @@
 /* Product Categories mejorado */
 .product-categories {
   padding: 100px 20px;
-  background-color: #f8f9fa; /* Color más suave */
+  background-color: transparent;
   text-align: center;
   position: relative;
   overflow: hidden;
@@ -178,7 +178,7 @@
 
 .section-title {
   font-size: clamp(2rem, 4vw, 2.8rem);
-  color: #2c3e50;
+  color: #f8f9fa;
   margin-bottom: 1.5rem;
   position: relative;
   display: inline-block;
@@ -199,7 +199,7 @@
 
 .section-subtitle {
   font-size: clamp(1rem, 2vw, 1.2rem);
-  color: #6c757d;
+  color: #adb5bd;
   margin-bottom: 4rem;
   max-width: 700px;
   margin-left: auto;
@@ -220,14 +220,15 @@
 }
 
 .category-card {
-  background: white;
+  background: rgba(30, 41, 59, 0.75);
+  backdrop-filter: blur(10px);
   border-radius: 16px;
   overflow: hidden;
   box-shadow: 0 5px 15px rgba(0, 0, 0, 0.05);
   transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   position: relative;
   z-index: 1;
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .category-card:hover {
@@ -270,13 +271,13 @@
 
 .category-title {
   font-size: 1.4rem;
-  color: #2c3e50;
+  color: #f8f9fa;
   margin-bottom: 1rem;
   font-weight: 700;
 }
 
 .category-description {
-  color: #6c757d;
+  color: #adb5bd;
   margin-bottom: 1.5rem;
   font-size: 0.95rem;
   line-height: 1.6;
@@ -426,7 +427,7 @@
 /* Optimizaciones generales */
 .inicio-container {
   font-family: 'Montserrat', sans-serif;
-  color: #333;
+  color: #f8f9fa;
   overflow-x: hidden;
   /* Mejor renderizado de fuentes */
   -webkit-font-smoothing: antialiased;
@@ -444,22 +445,4 @@
   }
 }
 
-/* Estilos para modo oscuro */
-@media (prefers-color-scheme: dark) {
-  .product-categories {
-    background-color: #121212;
-  }
-  
-  .category-card {
-    background-color: #1e1e1e;
-    border-color: #333;
-  }
-  
-  .category-title, .section-title {
-    color: #f8f9fa;
-  }
-  
-  .category-description, .section-subtitle {
-    color: #adb5bd;
-  }
-}
+/* Estilos modo oscuro ya aplicados a la raiz */

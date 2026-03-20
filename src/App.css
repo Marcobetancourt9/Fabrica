@@ -8,46 +8,46 @@
 }
 
 :root {
-  /* Sistema de diseño consistente */
+  /* Premium Modern Design System */
   --max-width: 1280px;
   --min-width: 320px;
   
-  /* Paleta de colores madura y masculina */
-  --color-primary: #2c3e50;         /* Azul oscuro elegante */
-  --color-primary-hover: #1a2530;   /* Azul más oscuro */
-  --color-secondary: #34495e;       /* Azul grisáceo */
-  --color-secondary-hover: #2c3e50; /* Tono más oscuro */
-  --color-accent: #c19a6b;          /* Marrón dorado elegante */
-  --color-accent-hover: #a87c56;    /* Marrón más oscuro */
-  --color-tertiary: #7d8b99;        /* Gris azulado */
+  /* Vibrant & Elegant Palette */
+  --color-primary: #4f46e5;         /* Indigo 600 */
+  --color-primary-hover: #4338ca;   /* Indigo 700 */
+  --color-secondary: #0ea5e9;       /* Sky 500 */
+  --color-secondary-hover: #0284c7; /* Sky 600 */
+  --color-accent: #f43f5e;          /* Rose 500 */
+  --color-accent-hover: #e11d48;    /* Rose 600 */
+  --color-tertiary: #8b5cf6;        /* Violet 500 */
   
-  /* Colores de texto */
-  --color-text: #2c3e50;            /* Azul oscuro */
-  --color-text-light: #5d6d7e;      /* Gris azulado medio */
-  --color-text-lighter: #85929e;    /* Gris azulado claro */
-  --color-text-inverse: #ecf0f1;    /* Casi blanco para fondos oscuros */
+  /* Text Colors */
+  --color-text: #f8fafc;
+  --color-text-light: #cbd5e1;
+  --color-text-lighter: #64748b;
+  --color-text-inverse: #ffffff;
   
-  /* Colores de fondo */
-  --color-background: #f8f9fa;      /* Gris muy claro */
-  --color-background-alt: #ecf0f1;  /* Gris claro */
-  --color-background-card: #ffffff; /* Blanco puro */
-  --color-background-dark: #2c3e50; /* Azul oscuro */
+  /* Backgrounds */
+  --color-background: #0f172a;
+  --color-background-alt: #1e293b;
+  --color-background-card: rgba(30, 41, 59, 0.75);
+  --color-background-dark: #0f172a; 
   
-  /* Colores de estado */
-  --color-success: #27ae60;         /* Verde esmeralda */
-  --color-warning: #e67e22;         /* Naranja tierra */
-  --color-error: #c0392b;           /* Rojo vino */
-  --color-info: #3498db;            /* Azul profesional */
+  /* Status Colors */
+  --color-success: #10b981;         /* Emerald 500 */
+  --color-warning: #f59e0b;         /* Amber 500 */
+  --color-error: #ef4444;           /* Red 500 */
+  --color-info: #3b82f6;            /* Blue 500 */
   
-  /* Bordes y sombras */
-  --border-radius: 6px;
-  --border-radius-sm: 4px;
-  --border-color: #d6dbdf;          /* Gris muy suave */
-  --shadow-sm: 0 1px 3px rgba(44, 62, 80, 0.12);
-  --shadow-md: 0 4px 6px rgba(44, 62, 80, 0.1);
-  --shadow-lg: 0 10px 15px rgba(44, 62, 80, 0.15);
+  /* Borders and Shadows for Premium Look */
+  --border-radius: 16px;
+  --border-radius-sm: 8px;
+  --border-color: rgba(51, 65, 85, 0.5);
+  --shadow-sm: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
   
-  /* Espaciado consistente */
+  /* Consistent Spacing */
   --spacing-xs: 0.25rem;
   --spacing-sm: 0.5rem;
   --spacing-md: 1rem;
@@ -55,34 +55,23 @@
   --spacing-xl: 2rem;
   --spacing-xxl: 3rem;
   
-  /* Tipografía */
+  /* Typography */
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --font-size-base: 1rem;
   --font-size-lg: 1.125rem;
   --font-size-xl: 1.25rem;
-  --font-size-xxl: 1.5rem;
+  --font-size-xxl: 1.75rem;
   
-  /* Transiciones */
-  --transition-fast: 150ms ease;
-  --transition-normal: 250ms ease;
-  --transition-slow: 350ms ease;
+  /* Transitions */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Modo oscuro con tonos masculinos */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-text: #ecf0f1;
-    --color-text-light: #bdc3c7;
-    --color-text-lighter: #95a5a6;
-    --color-background: #1a2530;
-    --color-background-alt: #2c3e50;
-    --color-background-card: #34495e;
-    --border-color: #2c3e50;
-  }
-}
+/* Dark Mode is now the default */
 
-/* Estilos base mejorados */
+/* Improved Base Styles */
 html {
   font-size: 16px;
   line-height: 1.6;
@@ -91,11 +80,10 @@ html {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 
-               'Helvetica Neue', Oxygen, Ubuntu, Cantarell, 'Fira Sans', 
-               'Droid Sans', sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: var(--color-text);
-  background-color: var(--color-background);
+  background: radial-gradient(circle at top right, #1e1b4b, #0f172a);
+  background-attachment: fixed;
   min-height: 100vh;
   min-width: var(--min-width);
   overflow-x: hidden;
