@@ -23,13 +23,15 @@ export function InstallAppButton({ className = '' }) {
   // 2. Escuchar el evento del navegador que permite instalar
   useEffect(() => {
     const handler = (e) => {
-      e.preventDefault(); // Evita que Chrome muestre el prompt nativo de inmediato
-      deferredPrompt.current = e; // Guarda el evento para usarlo al hacer clic
+      console.log('PWA: beforeinstallprompt disparado!');
+      e.preventDefault(); // Evita el prompt automático
+      deferredPrompt.current = e; // Guarda el evento
       setInstallable(true);
     };
 
     window.addEventListener('beforeinstallprompt', handler);
 
+    // Intentar capturar el evento si el componente se monta después de que se disparó (muy raro en SPAs pero posible)
     return () => {
       window.removeEventListener('beforeinstallprompt', handler);
     };
@@ -57,28 +59,14 @@ export function InstallAppButton({ className = '' }) {
 
   return (
     <div className={`install-button-wrapper ${className}`}>
-      {installable && (
         <button 
-          id="btn-install-android"
-          onClick={handleInstallClick} 
-          className="pwa-install-btn main-btn"
+          id="btn-install-main"
+          onClick={installable ? handleInstallClick : isIOS ? showIOSInstructions : () => alert("Estamos preparando la aplicación para tu dispositivo. Si este botón no responde, busca el icono de 'Instalar' o 'Añadir a pantalla de inicio' en el menú de opciones de tu navegador.")} 
+          className={`pwa-install-btn ${isIOS ? 'ios-btn' : 'main-btn'}`}
         >
-          <FaDownload className="pwa-icon" /> 
-          Instalar App Fabrica
+          {isIOS ? <FaShareSquare className="pwa-icon" /> : <FaDownload className="pwa-icon" />}
+          {isIOS ? 'Instalar App Fabrica' : 'Instalar App Fabrica'}
         </button>
-      )}
-      
-      {/* En iOS casi nunca se dispara 'beforeinstallprompt', por lo que mostramos las instrucciones manuales */}
-      {isIOS && !installable && (
-        <button 
-          id="btn-install-ios"
-          onClick={showIOSInstructions} 
-          className="pwa-install-btn ios-btn"
-        >
-          <FaShareSquare className="pwa-icon" /> 
-          Instalar en iOS
-        </button>
-      )}
     </div>
   );
 }

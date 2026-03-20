@@ -60,6 +60,17 @@
   transform: translateY(0);
 }
 
+.info-btn {
+  background: rgba(255, 255, 255, 0.05);
+  color: #adb5bd;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+}
+
+.info-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
 .pwa-icon {
   font-size: 1.2rem;
 }
