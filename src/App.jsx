@@ -36,9 +36,6 @@ export default function App() {
       <div className="app-container">
         <Header className={scrolled ? 'scrolled' : ''} />
         <main className="main-content">
-          <br />
-          <br />
-          <br />
           <Routes>
             <Route path="/" element={<Inicio />} />
             <Route path="/login" element={<LoginForm />} />
