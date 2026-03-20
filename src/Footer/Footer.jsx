@@ -7,13 +7,13 @@ const Footer = () => {
     <footer className="footer">
       <div className="footer-wave"></div>
       {/* Sección Destacada de Instalación PWA */}
-      {/* <section className="pwa-install-section">
-      {/*   <div className="pwa-install-content">
-      {/*     <h3>Lleva la Fábrica en tu bolsillo</h3>
-      {/*     <p>Instala nuestra aplicación para un acceso rápido y notificaciones en tiempo real.</p>
-      {/*     <div className="pwa-btn-container">
-      {/*       <InstallAppButton />
-      {/*     </div>
+      <section className="pwa-install-section">
+        <div className="pwa-install-content">
+          <h3>Lleva la Fábrica en tu bolsillo</h3>
+          <p>Instala nuestra aplicación para un acceso rápido y notificaciones en tiempo real.</p>
+          <div className="pwa-btn-container">
+            <InstallAppButton />
+          </div>
         </div>
       </section>
 
