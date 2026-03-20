@@ -1,0 +1,82 @@
+/* InstallAppButton Premium Design */
+.install-button-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+}
+
+.pwa-install-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  min-width: 220px;
+  padding: 0.875rem 2rem;
+  border-radius: 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Main Button (Android/Chrome) */
+.main-btn {
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  color: white;
+  box-shadow: 0 10px 25px -5px rgba(99, 102, 241, 0.4),
+              inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.main-btn:hover {
+  transform: translateY(-5px) scale(1.02);
+  box-shadow: 0 15px 30px -8px rgba(99, 102, 241, 0.5),
+              inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  filter: brightness(1.1);
+}
+
+.main-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* iOS Button */
+.ios-btn {
+  background: rgba(255, 255, 255, 0.05);
+  color: #f8fafc;
+}
+
+.ios-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.ios-btn:active {
+  transform: translateY(0);
+}
+
+.pwa-icon {
+  font-size: 1.2rem;
+}
+
+/* Success Feedback / Hover Highlight */
+@keyframes glow {
+  0% { box-shadow: 0 0 5px rgba(99, 102, 241, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(99, 102, 241, 0.4); }
+  100% { box-shadow: 0 0 5px rgba(99, 102, 241, 0.2); }
+}
+
+.main-btn:hover {
+  animation: glow 2s infinite;
+}
+
+@media (min-width: 640px) {
+  .install-button-wrapper {
+    flex-direction: row;
+  }
+}
