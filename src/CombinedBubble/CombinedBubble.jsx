@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { auth } from '../../credentials';
 import { onAuthStateChanged } from 'firebase/auth';
-import { FaUserShield, FaWhatsapp } from 'react-icons/fa';
+import { FaUserShield } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import './CombinedBubble.css';
 
@@ -32,36 +32,31 @@ const CombinedBubble = () => {
     navigate('/menuadmin');
   };
 
-  const handleWhatsAppClick = () => {
-    window.open('https://wa.me/+584125936487', '_blank');
-  };
 
-  // Always show the bubble, just change its functionality based on isAdmin
+
+  if (!isAdmin) return null;
+
   return (
     <div 
-      className={`combined-bubble ${isAdmin ? 'admin' : 'whatsapp'} ${isAnimating ? 'animating' : ''} ${clickEffect ? 'clicked' : ''}`}
+      className={`combined-bubble admin ${isAnimating ? 'animating' : ''} ${clickEffect ? 'clicked' : ''}`}
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
-      onClick={isAdmin ? handleAdminClick : handleWhatsAppClick}
-      aria-label={isAdmin ? "Panel de administrador" : "Contactar por WhatsApp"}
+      onClick={handleAdminClick}
+      aria-label="Panel de administrador"
     >
       <div className="bubble-core">
         <div className="icon-container">
-          {isAdmin ? (
-            <FaUserShield className="bubble-icon" />
-          ) : (
-            <FaWhatsapp className="bubble-icon" />
-          )}
+          <FaUserShield className="bubble-icon" />
         </div>
       </div>
       
       {isHovered && (
         <div className="tooltip">
-          {isAdmin ? "Panel de administrador" : "Contactar por WhatsApp"}
+          Panel de administrador
         </div>
       )}
       
-      {clickEffect && isAdmin && (
+      {clickEffect && (
         <div className="particles">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="particle" style={{

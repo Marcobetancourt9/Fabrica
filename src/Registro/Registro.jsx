@@ -2,7 +2,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import styles from "./Registro.module.css";
-import { getAuth, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup } from "firebase/auth";
+import { getAuth, createUserWithEmailAndPassword, GoogleAuthProvider, signInWithPopup, updateProfile } from "firebase/auth";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { app, db } from "../../credentials";
 import { FaGoogle, FaUser, FaEnvelope, FaPhone, FaIdCard, FaMapMarkerAlt, FaLock, FaEye, FaEyeSlash } from "react-icons/fa";
@@ -79,6 +79,12 @@ function RegistroForm() {
       setError("Ingresa un correo electrónico válido");
       return false;
     }
+    
+    // El teléfono debe contener solo números y una longitud lógica para ser válido
+    if (!/^\+?\d{7,15}$/.test(telefono.replace(/\s+/g, ''))) {
+      setError("Ingresa un número de teléfono válido (solo números)");
+      return false;
+    }
 
     if (password.length < 6) {
       setError("La contraseña debe tener al menos 6 caracteres");
@@ -106,6 +112,11 @@ function RegistroForm() {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const user = userCredential.user;
 
+      // Actualizar el perfil del usuario de Auth para incluir el nombre en DisplayName
+      await updateProfile(user, {
+        displayName: `${userData.nombre} ${userData.apellido}`.trim()
+      });
+
       await setDoc(doc(db, "users", user.uid), {
         ...userData,
         email,
@@ -119,11 +130,15 @@ function RegistroForm() {
     } catch (err) {
       console.error("Error en registro:", err);
       if (err.code === "auth/email-already-in-use") {
-        setError("Este correo ya está registrado");
+        setError("Este correo electrónico ya se encuentra registrado.");
       } else if (err.code === "auth/weak-password") {
-        setError("La contraseña es muy débil");
+        setError("La contraseña es muy débil. Usa letras, números y al menos 6 caracteres.");
+      } else if (err.code === "auth/invalid-email") {
+        setError("El formato del correo electrónico es inválido.");
+      } else if (err.code === "auth/operation-not-allowed") {
+        setError("El registro por correo está deshabilitado temporalmente.");
       } else {
-        setError("Ocurrió un error al registrarse");
+        setError(`Ocurrió un error al registrarse: ${err.message}`);
       }
     } finally {
       setLoading(false);

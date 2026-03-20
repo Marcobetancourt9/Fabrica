@@ -1,8 +1,7 @@
 :root {
   --admin-color: #8b5cf6;
   --admin-hover: #7c3aed;
-  --whatsapp-color: #25D366;
-  --whatsapp-hover: #128C7E;
+
   --icon-color: white;
   --shadow-color: rgba(0, 0, 0, 0.3);
   --transition-speed: 0.4s;
@@ -73,10 +72,6 @@
 
 .combined-bubble.admin:hover {
   background: linear-gradient(135deg, var(--admin-hover), #8b5cf6);
-}
-
-.combined-bubble.whatsapp:hover {
-  background: linear-gradient(135deg, var(--whatsapp-hover), #25D366);
 }
 
 .combined-bubble:hover .bubble-core {

@@ -26,15 +26,20 @@
   cursor: pointer;
   transition: all var(--transition-speed) cubic-bezier(0.68, -0.55, 0.265, 1.55);
   box-shadow: 
-    0 4px 12px var(--shadow-color),
-    inset 0 2px 4px rgba(255, 255, 255, 0.2);
-  background: linear-gradient(135deg, var(--login-color), #60a5fa);
+    0 4px 15px rgba(59, 130, 246, 0.4),
+    inset 0 2px 4px rgba(255, 255, 255, 0.1);
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(59, 130, 246, 0.4);
   overflow: visible;
 }
 
 /* Estado de logged-in */
 .auth-bubble.logged-in {
-  background: linear-gradient(135deg, var(--logout-color), #f87171);
+  box-shadow: 
+    0 4px 15px rgba(239, 68, 68, 0.4),
+    inset 0 2px 4px rgba(255, 255, 255, 0.1);
+  border-color: rgba(239, 68, 68, 0.4);
 }
 
 /* Núcleo de la burbuja */
@@ -42,7 +47,7 @@
   position: relative;
   width: calc(100% - 8px);
   height: calc(100% - 8px);
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 50%;
   backdrop-filter: blur(4px);
   display: flex;
@@ -82,8 +87,14 @@
 .auth-bubble:hover {
   transform: scale(1.1);
   box-shadow: 
-    0 6px 20px var(--shadow-color),
-    inset 0 4px 8px rgba(255, 255, 255, 0.2);
+    0 6px 20px rgba(59, 130, 246, 0.6),
+    inset 0 4px 8px rgba(255, 255, 255, 0.1);
+}
+
+.auth-bubble.logged-in:hover {
+  box-shadow: 
+    0 6px 20px rgba(239, 68, 68, 0.6),
+    inset 0 4px 8px rgba(255, 255, 255, 0.1);
 }
 
 .auth-bubble:hover .bubble-core {
@@ -91,11 +102,13 @@
 }
 
 .auth-bubble.logged-in:hover {
-  background: linear-gradient(135deg, var(--logout-hover), #ef4444);
+  background: rgba(30, 41, 59, 0.95);
+  border-color: rgba(239, 68, 68, 0.8);
 }
 
 .auth-bubble:not(.logged-in):hover {
-  background: linear-gradient(135deg, var(--login-hover), #3b82f6);
+  background: rgba(30, 41, 59, 0.95);
+  border-color: rgba(59, 130, 246, 0.8);
 }
 
 .auth-bubble:hover .main-icon {
@@ -129,14 +142,16 @@
 .tooltip {
   position: absolute;
   left: calc(100% + 15px);
-  background: white;
+  background: rgba(15, 23, 42, 0.95);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   padding: 8px 15px;
   border-radius: 20px;
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
-  color: #2d3748;
-  box-shadow: 0 3px 12px var(--shadow-color);
+  color: #f8fafc;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.5);
   opacity: 0;
   transform: translateX(-10px);
   transition: all var(--transition-speed) ease;

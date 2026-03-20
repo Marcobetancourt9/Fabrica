@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { db } from '../../credentials';
+import { db, auth } from '../../credentials';
 import { collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 import './TotalDeudas.css';
 
 const TotalDeudas = () => {
@@ -16,6 +17,15 @@ const TotalDeudas = () => {
   const [cargando, setCargando] = useState(true);
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [errores, setErrores] = useState({});
+  const [usuarioActual, setUsuarioActual] = useState(null);
+
+  // Listener para el usuario autenticado
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setUsuarioActual(user);
+    });
+    return () => unsub();
+  }, []);
 
   // Cargar proveedores desde Firebase
   useEffect(() => {
@@ -87,11 +97,18 @@ const TotalDeudas = () => {
     try {
       const pendiente = saldo - pagos;
 
+      const timestamp = new Date().toISOString();
+      const editorNombre = usuarioActual ? (usuarioActual.displayName || usuarioActual.email) : 'Anónimo';
+      const editorEmail = usuarioActual ? usuarioActual.email : '';
+
       const docRef = await addDoc(collection(db, 'proveedores'), {
         nombre: nuevoProveedor.nombre,
         saldo: saldo,
         pagos: pagos,
-        pendiente: pendiente
+        pendiente: pendiente,
+        editadoPor: editorNombre,
+        editadoEmail: editorEmail,
+        timestampEdicion: timestamp
       });
       
       setProveedores([...proveedores, { 
@@ -99,7 +116,10 @@ const TotalDeudas = () => {
         nombre: nuevoProveedor.nombre, 
         saldo: saldo, 
         pagos: pagos,
-        pendiente: pendiente
+        pendiente: pendiente,
+        editadoPor: editorNombre,
+        editadoEmail: editorEmail,
+        timestampEdicion: timestamp
       }]);
       
       setNuevoProveedor({ nombre: '', saldo: '', pagos: '', pendiente: '' });
@@ -139,16 +159,29 @@ const TotalDeudas = () => {
       
       const pendiente = saldo - pagos;
       
+      const timestamp = new Date().toISOString();
+      const editorNombre = usuarioActual ? (usuarioActual.displayName || usuarioActual.email) : 'Anónimo';
+      const editorEmail = usuarioActual ? usuarioActual.email : '';
+      
       await updateDoc(doc(db, 'proveedores', id), {
         nombre: proveedorActualizado.nombre,
         saldo: saldo,
         pagos: pagos,
-        pendiente: pendiente
+        pendiente: pendiente,
+        editadoPor: editorNombre,
+        editadoEmail: editorEmail,
+        timestampEdicion: timestamp
       });
       
-      // Actualizar el estado local con el pendiente recalculado
+      // Actualizar el estado local con el pendiente y auditoría recalculada
       setProveedores(proveedores.map(p => 
-        p.id === id ? {...p, pendiente: pendiente} : p
+        p.id === id ? {
+          ...p, 
+          pendiente: pendiente,
+          editadoPor: editorNombre,
+          editadoEmail: editorEmail,
+          timestampEdicion: timestamp
+        } : p
       ));
       
       setEditandoId(null);
@@ -198,6 +231,13 @@ const TotalDeudas = () => {
     );
   }
 
+  // Formatear Fecha
+  const formatearFechaEdicion = (isoString) => {
+    if (!isoString) return 'Nunca';
+    const fecha = new Date(isoString);
+    return `${fecha.toLocaleDateString()} a las ${fecha.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`;
+  };
+
   return (
     <div className="total-deudas-container">
       <br />
@@ -218,12 +258,18 @@ const TotalDeudas = () => {
           />
         </div>
         
-        <button 
-          className="btn-primario"
-          onClick={() => setMostrarFormulario(!mostrarFormulario)}
-        >
-          {mostrarFormulario ? 'Cancelar' : '+ Nuevo Proveedor'}
-        </button>
+        {usuarioActual ? (
+          <button 
+            className="btn-primario"
+            onClick={() => setMostrarFormulario(!mostrarFormulario)}
+          >
+            {mostrarFormulario ? 'Cancelar' : '+ Nuevo Proveedor'}
+          </button>
+        ) : (
+          <div className="mensaje-bloqueo">
+            🔒 Inicia sesión para gestionar deudas
+          </div>
+        )}
       </div>
       
       {/* Formulario para agregar proveedor */}
@@ -276,9 +322,9 @@ const TotalDeudas = () => {
                 onChange={(e) => {
                   const valor = e.target.value;
                   const saldo = parseFloat(nuevoProveedor.saldo) || 0;
+                  const pagosNum = valor === '' ? 0 : parseFloat(valor);
                   
-                  // No permitir que pagos sea mayor que saldo
-                  if (parseFloat(valor) <= saldo) {
+                  if (pagosNum <= saldo) {
                     setNuevoProveedor({...nuevoProveedor, pagos: valor});
                   }
                 }}
@@ -314,13 +360,14 @@ const TotalDeudas = () => {
               <th>Saldo ($)</th>
               <th>Pagos ($)</th>
               <th>Saldo Pendiente ($)</th>
+              <th>Última Edición</th>
               <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             {proveedoresFiltrados.length === 0 ? (
               <tr>
-                <td colSpan="5" className="sin-resultados">
+                <td colSpan="6" className="sin-resultados">
                   {busqueda ? 'No se encontraron proveedores con ese nombre' : 'No hay proveedores registrados'}
                 </td>
               </tr>
@@ -352,8 +399,7 @@ const TotalDeudas = () => {
                         value={proveedor.saldo}
                         onChange={(e) => {
                           const valor = e.target.value;
-                          // No permitir valores negativos
-                          if (valor >= 0) {
+                          if (valor === '' || parseFloat(valor) >= 0) {
                             manejarCambioEdicion(proveedor.id, 'saldo', valor);
                           }
                         }}
@@ -375,9 +421,9 @@ const TotalDeudas = () => {
                         onChange={(e) => {
                           const valor = e.target.value;
                           const saldo = parseFloat(proveedor.saldo) || 0;
+                          const pagosNum = valor === '' ? 0 : parseFloat(valor);
                           
-                          // No permitir que pagos sea mayor que saldo
-                          if (parseFloat(valor) <= saldo) {
+                          if (pagosNum <= saldo) {
                             manejarCambioEdicion(proveedor.id, 'pagos', valor);
                           }
                         }}
@@ -393,6 +439,13 @@ const TotalDeudas = () => {
                       ${parseFloat(proveedor.pendiente || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </td>
+                  <td className="celda-edicion">
+                    <div className="info-edicion">
+                      <span className="edicion-nombre">Editado por: {proveedor.editadoPor || 'Autor Desconocido'}</span>
+                      {proveedor.editadoEmail && <span className="edicion-email">({proveedor.editadoEmail})</span>}
+                      <span className="edicion-fecha">{formatearFechaEdicion(proveedor.timestampEdicion)}</span>
+                    </div>
+                  </td>
                   <td>
                     <div className="acciones">
                       {editandoId === proveedor.id ? (
@@ -400,11 +453,13 @@ const TotalDeudas = () => {
                           <button className="btn-guardar" onClick={() => actualizarProveedor(proveedor.id)}>💾</button>
                           <button className="btn-cancelar" onClick={() => setEditandoId(null)}>❌</button>
                         </>
-                      ) : (
+                      ) : usuarioActual ? (
                         <>
                           <button className="btn-editar" onClick={() => setEditandoId(proveedor.id)}>✏️</button>
                           <button className="btn-eliminar" onClick={() => eliminarProveedor(proveedor.id)}>🗑️</button>
                         </>
+                      ) : (
+                         <span style={{ fontSize: '0.8rem', opacity: 0.6, color: '#cbd5e1' }}>🔒</span>
                       )}
                     </div>
                   </td>
@@ -422,6 +477,7 @@ const TotalDeudas = () => {
               <td className={totalPendiente > 0 ? 'total-pendiente' : 'total-cero'}>
                 ${totalPendiente.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </td>
+              <td></td>
               <td></td>
             </tr>
           </tfoot>
