@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../credentials';
+import { InstallAppButton } from '../PWA/InstallAppButton';
+import FichaProveedor from './FichaProveedor';
 import './CuentasPorPagar.css';
 
 const CuentasPorPagar = () => {
@@ -18,28 +20,23 @@ const CuentasPorPagar = () => {
   const [valorEditado, setValorEditado] = useState('');
   const [editandoPago, setEditandoPago] = useState(null);
   const [valorPagoEditado, setValorPagoEditado] = useState('');
+  const [proveedorSeleccionado, setProveedorSeleccionado] = useState(null);
+  const [mostrarModalDetalle, setMostrarModalDetalle] = useState(false);
+  const [semanaAbierta, setSemanaAbierta] = useState(null);
 
   // Generar semanas para 2025
   function generarSemanas2025() {
     const semanas = [];
-    let fechaInicio = new Date(2025, 0, 1); // 01/01/2025
-    const fechaFin = new Date(2025, 11, 31); // 31/12/2025
+    let fechaInicio = new Date(2025, 0, 1);
+    const fechaFin = new Date(2025, 11, 31);
     
     while (fechaInicio <= fechaFin) {
       const inicioSemana = new Date(fechaInicio);
       const finSemana = new Date(fechaInicio);
       finSemana.setDate(finSemana.getDate() + 6);
       
-      if (finSemana > fechaFin) {
-        finSemana.setTime(fechaFin.getTime());
-      }
-      
       const formatoFecha = (fecha) => {
-        return fecha.toLocaleDateString('es-ES', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric'
-        });
+        return fecha.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
       };
       
       semanas.push({
@@ -47,18 +44,15 @@ const CuentasPorPagar = () => {
         fin: formatoFecha(finSemana),
         key: `${formatoFecha(inicioSemana)}-${formatoFecha(finSemana)}`
       });
-      
       fechaInicio.setDate(fechaInicio.getDate() + 7);
     }
-    
     return semanas;
   }
 
-  // Cargar proveedores y semanas desde Firebase
+  // Cargar datos desde Firebase
   useEffect(() => {
     const cargarTodo = async () => {
       try {
-        // Cargar proveedores
         const querySnapshot = await getDocs(collection(db, 'por_pagar'));
         const proveedoresData = [];
         querySnapshot.forEach((docSnap) => {
@@ -66,28 +60,51 @@ const CuentasPorPagar = () => {
         });
         setProveedores(proveedoresData);
 
-        // Cargar semanas desde configuración
         const configRef = doc(db, 'configuracion', 'semanas_por_pagar');
         const configSnap = await getDoc(configRef);
-        
         if (configSnap.exists()) {
           setSemanas(configSnap.data().lista || []);
         } else {
-          // Inicializar por primera vez con datos del 2025
           const semanasIniciales = generarSemanas2025();
-          await setDoc(configRef, {
-            lista: semanasIniciales,
-            inicializado: true
-          });
+          await setDoc(configRef, { lista: semanasIniciales, inicializado: true });
           setSemanas(semanasIniciales);
         }
       } catch (error) {
         console.error('Error cargando datos:', error);
       }
     };
-
     cargarTodo();
   }, []);
+
+  // Calcular deuda total por semana sumando días
+  const obtenerTotalesSemana = (proveedor, semanaKey) => {
+    const registroSemana = proveedor.registroDiario?.[semanaKey] || {};
+    let montoTotal = 0;
+    let pagadoTotal = 0;
+    
+    // Sumar montos de los días incluyendo impuestos y retenciones
+    Object.values(registroSemana).forEach(dia => {
+      const base = parseFloat(dia.monto) || 0;
+      const iva16 = parseFloat(dia.iva16) || 0;
+      const iva8 = parseFloat(dia.iva8) || 0;
+      const retencion = parseFloat(dia.retencion) || 0;
+      
+      const totalDia = base + iva16 + iva8 + retencion;
+      montoTotal += totalDia;
+      pagadoTotal += parseFloat(dia.pagado) || 0;
+    });
+
+    // Mantener compatibilidad con el sistema anterior si no hay registros diarios aún
+    if (montoTotal === 0) {
+      const deudaAntigua = proveedor.deudas?.find(d => d.semana === semanaKey);
+      if (deudaAntigua) {
+        montoTotal = parseFloat(deudaAntigua.monto) || 0;
+        pagadoTotal = parseFloat(deudaAntigua.pagado) || 0;
+      }
+    }
+
+    return { monto: montoTotal, pagado: pagadoTotal, saldo: Math.max(0, montoTotal - pagadoTotal) };
+  };
 
   // Agregar nuevo proveedor
   const agregarProveedor = async () => {
@@ -97,17 +114,20 @@ const CuentasPorPagar = () => {
     }
     
     try {
-      // Inicializar deudas para todas las semanas con monto como string vacío
+      // Inicializar deudas para todas las semanas
       const deudasInicializadas = semanas.map(semana => ({
         semana: semana.key,
-        monto: '', // Inicializar como string vacío en lugar de 0
-        pagado: 0, // Cambiado a número para representar el monto pagado
-        pagadoCompleto: false // Para saber si se marcó como pagado completamente
+        monto: '',
+        pagado: 0,
+        pagadoCompleto: false
       }));
       
       const proveedorConDeudas = {
         nombre: nuevoProveedor.nombre,
-        deudas: deudasInicializadas
+        deudas: deudasInicializadas,
+        rif: '',
+        encargado: '',
+        registroDiario: {}
       };
       
       const docRef = await addDoc(collection(db, 'por_pagar'), proveedorConDeudas);
@@ -116,6 +136,207 @@ const CuentasPorPagar = () => {
     } catch (error) {
       console.error('Error agregando proveedor:', error);
     }
+  };
+
+  // Abrir ficha full-screen
+  const abrirDetalleProveedor = (proveedor, semanaKey = null) => {
+    setProveedorSeleccionado(proveedor);
+    setSemanaAbierta(semanaKey);
+    setMostrarModalDetalle(true);
+  };
+
+  // Sincronizar Ficha con Firebase
+  const guardarDetalleProveedor = async (nuevosDatos) => {
+    try {
+      const pRef = doc(db, 'por_pagar', proveedorSeleccionado.id);
+      const payload = {
+        rif: nuevosDatos.rif,
+        encargado: nuevosDatos.encargado,
+        registroDiario: nuevosDatos.registroDiario
+      };
+
+      await updateDoc(pRef, payload);
+
+      setProveedores(proveedores.map(p => 
+        p.id === proveedorSeleccionado.id ? { ...p, ...payload } : p
+      ));
+
+      setMostrarModalDetalle(false);
+      setProveedorSeleccionado(null);
+      alert('Cambios guardados exitosamente en la base de datos.');
+    } catch (error) {
+      console.error('Error al guardar en Firebase:', error);
+      alert('Error al sincronizar con la base de datos.');
+    }
+  };
+
+  // Descargar CSV por semana (Reporte Contable Detallado)
+  const descargarCSV = (semanaKey) => {
+    const semana = semanas.find(s => s.key === semanaKey);
+    const diasSemana = [0, 1, 2, 3, 4, 5, 6].map(i => {
+      const [d, m, a] = semana.inicio.split('/').map(Number);
+      const f = new Date(a, m - 1, d);
+      f.setDate(f.getDate() + i);
+      return f.toISOString().split('T')[0];
+    });
+
+    const titular = "Inversiones pincho pan express II C.A.";
+    const subTitular = `Reporte de Cuentas por Pagar - Semana: ${semana.inicio} al ${semana.fin}`;
+
+    // Encabezados contables solicitados
+    const headers = [
+      'Proveedor', 'RIF', 'Encargado', 'Fecha', 'Tipo de Documento', 'Nro Factura',
+      'Monto Base', 'IVA 16%', 'IVA 8%', 'Ret. Municipal', 'Total Bruto',
+      'Pagado', 'Saldo', 'Referencia/Pago', 'Observaciones'
+    ];
+
+    const filasTransactions = [];
+
+    proveedores.forEach(p => {
+      const registroSemana = p.registroDiario?.[semanaKey] || {};
+      
+      diasSemana.forEach(dk => {
+        const d = registroSemana[dk];
+        if (d && (parseFloat(d.monto) > 0 || parseFloat(d.pagado) > 0)) {
+          const base = parseFloat(d.monto) || 0;
+          const iva16 = parseFloat(d.iva16) || 0;
+          const iva8 = parseFloat(d.iva8) || 0;
+          const ret = parseFloat(d.retencion) || 0;
+          const pagado = parseFloat(d.pagado) || 0;
+          const totalBruto = base + iva16 + iva8 + ret;
+          const saldo = Math.max(0, totalBruto - pagado);
+
+          const formatearNum = (num) => num.toFixed(2).replace('.', ',');
+
+          filasTransactions.push([
+            `"${p.nombre}"`,
+            `"${p.rif || '-'}"`,
+            `"${p.encargado || '-'}"`,
+            `"${d.fechaOperacion || dk}"`,
+            `"${d.tipoDocumento || 'Factura'}"`,
+            `"${d.numeroFactura || '-'}"`,
+            formatearNum(base),
+            formatearNum(iva16),
+            formatearNum(iva8),
+            formatearNum(ret),
+            formatearNum(totalBruto),
+            formatearNum(pagado),
+            formatearNum(saldo),
+            `"${d.referencia || '-'}"`,
+            `"${(d.observaciones || '').replace(/\n/g, ' ')}"`
+          ]);
+        }
+      });
+    });
+
+    // Construcción del contenido CSV con Titular
+    const csvContent = [
+      titular,
+      subTitular,
+      '', // Espacio en blanco
+      headers.join(';'),
+      ...filasTransactions.map(f => f.join(';'))
+    ].join('\n');
+
+    const universalBOM = "\uFEFF";
+    const blob = new Blob([universalBOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Reporte_PinchoPan_${semanaKey.replace(/\//g, '-')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Descargar CSV Resumen (Una fila por proveedor por semana)
+  const descargarResumenCSV = (semanaKey) => {
+    const semana = semanas.find(s => s.key === semanaKey);
+    const titular = "Inversiones pincho pan express II C.A.";
+    const subTitular = `Resumen General de Cuentas por Pagar - Semana: ${semana.inicio} al ${semana.fin}`;
+
+    const headers = ['Proveedor', 'RIF', 'Encargado', 'Deuda Total', 'Total Pagado', 'Saldo Pendiente'];
+
+    const filas = proveedores.map(p => {
+      const totales = obtenerTotalesSemana(p, semanaKey);
+      const formatearNum = (num) => num.toFixed(2).replace('.', ',');
+
+      return [
+        `"${p.nombre}"`,
+        `"${p.rif || '-'}"`,
+        `"${p.encargado || '-'}"`,
+        formatearNum(totales.monto),
+        formatearNum(totales.pagado),
+        formatearNum(totales.saldo)
+      ];
+    });
+
+    const csvContent = [
+      titular,
+      subTitular,
+      '',
+      headers.join(';'),
+      ...filas.map(f => f.join(';'))
+    ].join('\n');
+
+    const universalBOM = "\uFEFF";
+    const blob = new Blob([universalBOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Resumen_Cuentas_${semanaKey.replace(/\//g, '-')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Descargar Reporte Anual (Consolidado de todas las semanas)
+  const descargarReporteAnualCSV = () => {
+    const titular = "Inversiones pincho pan express II C.A.";
+    const subTitular = "Reporte Anual Consolidado - Periodo 2025";
+
+    const headers = ['Proveedor', 'RIF', 'Encargado', 'Deuda Total Anual', 'Total Pagado Anual', 'Saldo Anual Pendiente'];
+
+    const filas = proveedores.map(p => {
+      let deudaAnual = 0;
+      let pagadoAnual = 0;
+      
+      // Sumar todas las semanas registradas
+      semanas.forEach(semana => {
+        const totales = obtenerTotalesSemana(p, semana.key);
+        deudaAnual += totales.monto;
+        pagadoAnual += totales.pagado;
+      });
+
+      const formatearNum = (num) => num.toFixed(2).replace('.', ',');
+
+      return [
+        `"${p.nombre}"`,
+        `"${p.rif || '-'}"`,
+        `"${p.encargado || '-'}"`,
+        formatearNum(deudaAnual),
+        formatearNum(pagadoAnual),
+        formatearNum(Math.max(0, deudaAnual - pagadoAnual))
+      ];
+    });
+
+    const csvContent = [
+      titular,
+      subTitular,
+      '',
+      headers.join(';'),
+      ...filas.map(f => f.join(';'))
+    ].join('\n');
+
+    const universalBOM = "\uFEFF";
+    const blob = new Blob([universalBOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'Reporte_Anual_Consolidado_2025.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Eliminar proveedor
@@ -324,17 +545,17 @@ const CuentasPorPagar = () => {
     return Math.max(0, monto - pagado);
   };
 
-  // Calcular total por proveedor
+  // Calcular total general por proveedor (sumando todas las semanas)
   const calcularTotalProveedor = (proveedor) => {
-    return proveedor.deudas.reduce((total, deuda) => {
-      return total + (parseFloat(deuda.monto) || 0);
+    return semanas.reduce((total, semana) => {
+      return total + obtenerTotalesSemana(proveedor, semana.key).monto;
     }, 0);
   };
 
   // Calcular total pagado por proveedor
   const calcularTotalPagado = (proveedor) => {
-    return proveedor.deudas.reduce((total, deuda) => {
-      return total + (parseFloat(deuda.pagado) || 0);
+    return semanas.reduce((total, semana) => {
+      return total + obtenerTotalesSemana(proveedor, semana.key).pagado;
     }, 0);
   };
 
@@ -343,23 +564,25 @@ const CuentasPorPagar = () => {
     return calcularTotalProveedor(proveedor) - calcularTotalPagado(proveedor);
   };
 
-  // Calcular total general
+  // Calcular total general de todos los proveedores
   const calcularTotalGeneral = () => {
     return proveedores.reduce((total, proveedor) => {
       return total + calcularTotalProveedor(proveedor);
     }, 0);
   };
 
-  // Calcular total pagado general
+  // Calcular total pagado general de todos los proveedores
   const calcularTotalPagadoGeneral = () => {
     return proveedores.reduce((total, proveedor) => {
       return total + calcularTotalPagado(proveedor);
     }, 0);
   };
 
-  // Calcular saldo pendiente general
+  // Calcular saldo pendiente general de todos los proveedores filtrados
   const calcularSaldoPendienteGeneral = () => {
-    return calcularTotalGeneral() - calcularTotalPagadoGeneral();
+    return proveedoresFiltrados.reduce((total, p) => {
+      return total + calcularSaldoPendienteProveedor(p);
+    }, 0);
   };
 
   // Iniciar edición de deuda
@@ -406,6 +629,18 @@ const CuentasPorPagar = () => {
     if (typeof monto === 'string' && monto.trim() === '') return '-';
     return `$${parseFloat(monto).toLocaleString()}`;
   };
+
+  if (mostrarModalDetalle && proveedorSeleccionado) {
+    return (
+      <FichaProveedor 
+        proveedor={proveedorSeleccionado}
+        semanas={semanas}
+        semanaAbiertaInicial={semanaAbierta}
+        onClose={() => setMostrarModalDetalle(false)}
+        onSave={guardarDetalleProveedor}
+      />
+    );
+  }
 
   return (
     <div className="cuentas-por-pagar">
@@ -460,6 +695,9 @@ const CuentasPorPagar = () => {
           
           <button className="btn btn-secondary" onClick={() => setMostrarModal(true)}>
             Agregar Semana
+          </button>
+          <button className="btn-reporte-anual" onClick={descargarReporteAnualCSV}>
+            📥 Reporte Anual
           </button>
         </div>
       </div>
@@ -538,13 +776,29 @@ const CuentasPorPagar = () => {
                     <span>a</span>
                     <span>{semana.fin}</span>
                   </div>
-                  <button 
-                    className="btn-eliminar-semana"
-                    onClick={() => eliminarSemana(semana.key)}
-                    title="Eliminar semana"
-                  >
-                    ✕
-                  </button>
+                  <div className="semana-acciones">
+                    <button 
+                      className="btn-descargar-csv"
+                      onClick={() => descargarCSV(semana.key)}
+                      title="Descargar Reporte Detallado (Factura por Fila)"
+                    >
+                      📄 Detalle
+                    </button>
+                    <button 
+                      className="btn-descargar-resumen"
+                      onClick={() => descargarResumenCSV(semana.key)}
+                      title="Descargar Resumen General (Monto Total/Pagado)"
+                    >
+                      📊 Resumen
+                    </button>
+                    <button 
+                      className="btn-eliminar-semana"
+                      onClick={() => eliminarSemana(semana.key)}
+                      title="Eliminar semana"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </th>
               ))}
               <th className="total-header">Total a Pagar</th>
@@ -557,163 +811,109 @@ const CuentasPorPagar = () => {
             {proveedoresFiltrados.length > 0 ? (
               proveedoresFiltrados.map(proveedor => (
                 <tr key={proveedor.id}>
-                  <td className="proveedor-nombre">{proveedor.nombre}</td>
+                  <td 
+                    className="proveedor-nombre clickable"
+                    onClick={() => abrirDetalleProveedor(proveedor)}
+                  >
+                    <div className="nombre-wrapper">
+                      {proveedor.nombre}
+                      <span className="info-tag">VER FICHA</span>
+                    </div>
+                  </td>
                   {semanas.map(semana => {
-                    const deuda = proveedor.deudas.find(d => d.semana === semana.key) || { monto: '', pagado: 0, pagadoCompleto: false };
-                    const estaEditandoDeuda = editandoDeuda && 
-                                             editandoDeuda.proveedorId === proveedor.id && 
-                                             editandoDeuda.semanaKey === semana.key;
-                    const estaEditandoPago = editandoPago && 
-                                            editandoPago.proveedorId === proveedor.id && 
-                                            editandoPago.semanaKey === semana.key;
-                    const saldoPendiente = calcularSaldoPendiente(deuda);
+                    const totales = obtenerTotalesSemana(proveedor, semana.key);
+                    const deudaMeta = proveedor.deudas?.find(d => d.semana === semana.key) || {};
                     
                     return (
-                      <td key={semana.key} className={deuda.pagadoCompleto ? 'deuda pagado' : 'deuda'}>
+                      <td key={semana.key} className={deudaMeta.pagadoCompleto || (totales.monto > 0 && totales.saldo === 0) ? 'deuda pagado' : 'deuda'}>
                         <div className="contenido-deuda">
-                          <div className="monto-section">
-                            <div className="monto-label">Deuda:</div>
-                            {estaEditandoDeuda ? (
-                              <div className="edicion-deuda">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={valorEditado}
-                                  onChange={(e) => setValorEditado(e.target.value)}
-                                  autoFocus
-                                  className="input-edicion"
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') guardarEdicionDeuda();
-                                    if (e.key === 'Escape') cancelarEdicionDeuda();
-                                  }}
-                                  placeholder="0.00"
-                                />
-                                <div className="controles-edicion">
-                                  <button 
-                                    className="btn-guardar"
-                                    onClick={guardarEdicionDeuda}
-                                    title="Guardar"
-                                  >
-                                    ✓
-                                  </button>
-                                  <button 
-                                    className="btn-cancelar"
-                                    onClick={cancelarEdicionDeuda}
-                                    title="Cancelar"
-                                  >
-                                    ✕
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div 
-                                className="monto-deuda"
-                                onClick={() => iniciarEdicionDeuda(proveedor.id, semana.key, deuda.monto)}
-                              >
-                                {formatearMonto(deuda.monto)}
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="pago-section">
-                            <div className="pago-label">Pagado:</div>
-                            {estaEditandoPago ? (
-                              <div className="edicion-pago">
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={valorPagoEditado}
-                                  onChange={(e) => setValorPagoEditado(e.target.value)}
-                                  autoFocus
-                                  className="input-edicion"
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') guardarEdicionPago();
-                                    if (e.key === 'Escape') cancelarEdicionPago();
-                                  }}
-                                  placeholder="0.00"
-                                />
-                                <div className="controles-edicion">
-                                  <button 
-                                    className="btn-guardar"
-                                    onClick={guardarEdicionPago}
-                                    title="Guardar"
-                                  >
-                                    ✓
-                                  </button>
-                                  <button 
-                                    className="btn-cancelar"
-                                    onClick={cancelarEdicionPago}
-                                    title="Cancelar"
-                                  >
-                                    ✕
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div 
-                                className="monto-pagado"
-                                onClick={() => iniciarEdicionPago(proveedor.id, semana.key, deuda.pagado)}
-                              >
-                                {formatearMonto(deuda.pagado)}
-                              </div>
-                            )}
-                          </div>
-                          
-                          <div className="saldo-section">
-                            <div className="saldo-label">Saldo:</div>
-                            <div className="saldo-pendiente">
-                              {formatearMonto(saldoPendiente)}
+                          <div className="monto-summary" onClick={() => abrirDetalleProveedor(proveedor, semana.key)}>
+                            <div className="summary-row">
+                              <span className="label">Total Deuda:</span>
+                               <span className="value">${totales.monto.toLocaleString()}</span>
+                            </div>
+                            <div className="summary-row">
+                              <span className="label">Saldo:</span>
+                              <span className={`value ${totales.saldo > 0 ? 'pendiente' : 'al-dia'}`}>
+                                ${totales.saldo.toLocaleString()}
+                              </span>
                             </div>
                           </div>
                           
                           <label className="checkbox-pagado">
                             <input
                               type="checkbox"
-                              checked={deuda.pagadoCompleto}
+                              checked={deudaMeta.pagadoCompleto}
                               onChange={(e) => actualizarPagoCompleto(proveedor.id, semana.key, e.target.checked)}
                             />
                             <span className="checkmark"></span>
-                            Pagado completo
+                            Marcar pagado
                           </label>
                         </div>
                       </td>
                     );
                   })}
-                  <td className="total-proveedor">
-                    <div className="total-monto">
-                      ${calcularTotalProveedor(proveedor).toLocaleString()}
-                    </div>
-                  </td>
-                  <td className="total-pagado">
-                    <div className="total-monto">
-                      ${calcularTotalPagado(proveedor).toLocaleString()}
-                    </div>
-                  </td>
-                  <td className="saldo-pendiente">
-                    <div className="total-monto">
-                      ${calcularSaldoPendienteProveedor(proveedor).toLocaleString()}
-                    </div>
-                  </td>
-                  <td className="acciones">
-                    <button 
-                      className="btn btn-eliminar"
-                      onClick={() => eliminarProveedor(proveedor.id)}
-                    >
-                      Eliminar
-                    </button>
-                  </td>
-                </tr>
+                    <td className="total-proveedor">
+                      <div className="total-monto">
+                        ${calcularTotalProveedor(proveedor).toLocaleString()}
+                      </div>
+                    </td>
+                    <td className="total-pagado">
+                      <div className="total-monto">
+                        ${calcularTotalPagado(proveedor).toLocaleString()}
+                      </div>
+                    </td>
+                    <td className="saldo-pendiente">
+                      <div className="total-monto">
+                        ${calcularSaldoPendienteProveedor(proveedor).toLocaleString()}
+                      </div>
+                    </td>
+                    <td className="acciones">
+                      <button 
+                        className="btn btn-eliminar"
+                        onClick={() => eliminarProveedor(proveedor.id)}
+                      >
+                        Eliminar
+                      </button>
+                    </td>
+                  </tr>
               ))
             ) : (
               <tr>
-                <td colSpan={semanas.length + 4} className="sin-resultados">
+                <td colSpan={semanas.length + 5} className="sin-resultados">
                   {proveedores.length === 0 ? 'No hay proveedores registrados' : 'No se encontraron resultados'}
                 </td>
               </tr>
             )}
           </tbody>
+          
+          {/* Footer con totales por semana */}
+          <tfoot className="tabla-footer">
+            <tr>
+              <td className="footer-label">TOTAL SEMANAL:</td>
+              {semanas.map(semana => {
+                const totalSemana = proveedoresFiltrados.reduce((sum, p) => {
+                  return sum + obtenerTotalesSemana(p, semana.key).saldo;
+                }, 0);
+                
+                return (
+                  <td key={semana.key} className="footer-monto">
+                    ${totalSemana.toLocaleString()}
+                  </td>
+                );
+              })}
+              <td className="footer-monto-total">
+                ${proveedoresFiltrados.reduce((sum, p) => sum + calcularTotalProveedor(p), 0).toLocaleString()}
+              </td>
+              <td className="footer-monto-total">
+                ${proveedoresFiltrados.reduce((sum, p) => sum + calcularTotalPagado(p), 0).toLocaleString()}
+              </td>
+              <td className="footer-monto-total highlighted">
+                ${proveedoresFiltrados.reduce((sum, p) => sum + calcularSaldoPendienteGeneral(), 0).toLocaleString()}
+              </td>
+              <td></td>
+            </tr>
+          </tfoot>
         </table>
       </div>
     </div>

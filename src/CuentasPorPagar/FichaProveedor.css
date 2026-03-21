@@ -1,0 +1,373 @@
+.ficha-overlay {
+  width: 100%;
+  min-height: calc(100vh - 160px); /* Ajuste aproximado para que quepa entre header y footer */
+  background-color: transparent;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow: visible;
+  animation: fadeInFicha 0.4s ease-out;
+  padding: 0;
+  margin-top: 20px;
+}
+
+@keyframes fadeInFicha {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ficha-full-card {
+  width: 100%;
+  min-height: 80vh;
+  max-width: 100%; 
+  background: radial-gradient(circle at top left, #0f172a, #020617);
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px; 
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+/* Header de la Ficha */
+.ficha-header {
+  padding: 20px 40px;
+  background: rgba(255, 255, 255, 0.02);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  backdrop-filter: blur(10px);
+}
+
+.header-info .subtitle {
+  display: block;
+  font-size: 0.75rem;
+  color: #fbbf24;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 4px;
+}
+
+.header-info h1 {
+  font-size: 1.8rem;
+  color: white;
+  margin: 0;
+  font-weight: 800;
+}
+
+.btn-close-full {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  padding: 10px 20px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-close-full:hover {
+  background: #ef4444;
+  color: white;
+}
+
+/* Contenido Principal Layout */
+.ficha-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  background-image: radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.03) 0%, transparent 60%);
+}
+
+/* Sidebar Info General */
+.ficha-sidebar {
+  width: 400px;
+  padding: 40px;
+  background: rgba(0, 0, 0, 0.2);
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+  overflow-y: auto;
+}
+
+.info-general-panel h3 {
+  color: white;
+  font-size: 1.1rem;
+  margin-bottom: 20px;
+  border-left: 3px solid #fbbf24;
+  padding-left: 12px;
+}
+
+.input-field-full {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.input-field-full label {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  margin-left: 4px;
+}
+
+.input-field-full input {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 14px;
+  border-radius: 12px;
+  color: white;
+  font-size: 1rem;
+  transition: all 0.3s;
+}
+
+.input-field-full input:focus {
+  border-color: #fbbf24;
+  background: rgba(251, 191, 36, 0.05);
+  outline: none;
+  box-shadow: 0 0 15px rgba(251, 191, 36, 0.1);
+}
+
+.resumen-proveedor-card {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 25px;
+}
+
+.total-display {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 15px;
+}
+
+.resumen-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.resumen-row .val {
+  color: white;
+  font-weight: 700;
+  font-family: 'Inter', monospace;
+}
+
+.resumen-row .val.green { color: #10b981; }
+.resumen-row .val.highlight { color: #fbbf24; font-size: 1.4rem; }
+
+.resumen-row.total {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 15px;
+  margin-top: 5px;
+}
+
+/* Área de Historial Diario */
+.ficha-main-area {
+  flex: 1;
+  padding: 40px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 30px;
+}
+
+.area-header h2 {
+  color: white;
+  font-size: 1.6rem;
+  margin-bottom: 8px;
+}
+
+.area-header p {
+  color: #94a3b8;
+}
+
+.semanas-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.week-full-section {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.01);
+  overflow: hidden;
+  transition: all 0.3s;
+}
+
+.week-full-section.open {
+  border-color: #fbbf24;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.week-full-header {
+  padding: 25px 35px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.week-full-header .info {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  color: white;
+}
+
+.week-full-header .badges {
+  display: flex;
+  gap: 12px;
+}
+
+.b-monto, .b-saldo {
+  padding: 6px 14px;
+  background: rgba(59, 130, 246, 0.15);
+  color: #60a5fa;
+  border-radius: 30px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.b-saldo.red { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+.b-saldo.green { background: rgba(16, 185, 129, 0.15); color: #34d399; }
+
+/* Listado de Días */
+.days-full-list {
+  padding: 20px 35px 35px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.day-full-entry {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.2s;
+}
+
+.day-full-entry.active {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.day-full-entry.has-data {
+  border-left: 4px solid #fbbf24;
+}
+
+.day-full-header {
+  padding: 15px 25px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.day-full-header .name {
+  color: white;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.day-full-header .m-total {
+  color: #fbbf24;
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+
+.btn-edit-inline {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #94a3b8;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  cursor: pointer;
+}
+
+.btn-edit-inline:hover {
+  background: #fbbf24;
+  color: #000;
+}
+
+/* Formulario Diario */
+.day-full-form {
+  padding: 30px;
+  background: rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.form-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.form-grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+
+.f-field { display: flex; flex-direction: column; gap: 8px; }
+.f-field label { color: #94a3b8; font-size: 0.8rem; margin-left: 2px; }
+.f-field input { 
+  background: rgba(255, 255, 255, 0.02); 
+  border: 1px solid rgba(255, 255, 255, 0.08); 
+  padding: 12px; 
+  border-radius: 10px; 
+  color: white; 
+  font-size: 0.95rem; 
+}
+
+.f-field.calc input { background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.2); color: #10b981; font-weight: 700; }
+
+/* Footer Acciones Permanente */
+.ficha-footer {
+  padding: 25px 40px;
+  background: rgba(0, 0, 0, 0.4);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.footer-status {
+  color: rgba(255, 255, 255, 0.3);
+  font-size: 0.8rem;
+  font-style: italic;
+}
+
+.f-actions { display: flex; gap: 15px; }
+
+.btn-primary-full {
+  background: #fbbf24;
+  color: #000;
+  border: none;
+  padding: 12px 35px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(251, 191, 36, 0.3);
+  transition: all 0.3s;
+}
+
+.btn-primary-full:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(251, 191, 36, 0.5); }
+
+.btn-secondary-full { background: transparent; border: 1px solid rgba(255, 255, 255, 0.1); color: #94a3b8; padding: 12px 25px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: 0.3s; }
+.btn-secondary-full:hover { background: rgba(255, 255, 255, 0.05); color: white; }
+
+@media (max-width: 1100px) {
+  .ficha-sidebar { width: 320px; }
+}
+
+@media (max-width: 850px) {
+  .ficha-content { flex-direction: column; }
+  .ficha-sidebar { width: 100%; border-right: none; border-bottom: 1px solid rgba(255, 255, 255, 0.05); height: auto; }
+  .form-grid-3, .form-grid-2 { grid-template-columns: 1fr; }
+}
