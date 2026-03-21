@@ -339,6 +339,78 @@ const CuentasPorPagar = () => {
     document.body.removeChild(link);
   };
 
+  // Descargar Reporte Histórico por Proveedor (Todas sus semanas y transacciones)
+  const descargarReporteProveedorCSV = (p) => {
+    const titular = "Inversiones pincho pan express II C.A.";
+    const subTitular = `Estado de Cuenta Histórico: ${p.nombre} (RIF: ${p.rif || '-'})`;
+
+    const headers = [
+      'Semana', 'Fecha', 'Tipo de Documento', 'Nro Factura',
+      'Monto Base', 'IVA 16%', 'IVA 8%', 'Ret. Municipal', 'Total Bruto',
+      'Pagado', 'Saldo', 'Referencia/Pago', 'Observaciones'
+    ];
+
+    const filasTransactions = [];
+
+    semanas.forEach(semana => {
+      const registroSemana = p.registroDiario?.[semana.key] || {};
+      const [d, m, a] = semana.inicio.split('/').map(Number);
+      
+      [0, 1, 2, 3, 4, 5, 6].forEach(i => {
+        const fechaBase = new Date(a, m - 1, d);
+        fechaBase.setDate(fechaBase.getDate() + i);
+        const dk = fechaBase.toISOString().split('T')[0];
+        
+        const dData = registroSemana[dk];
+        if (dData && (parseFloat(dData.monto) > 0 || parseFloat(dData.pagado) > 0)) {
+          const base = parseFloat(dData.monto) || 0;
+          const iva16 = parseFloat(dData.iva16) || 0;
+          const iva8 = parseFloat(dData.iva8) || 0;
+          const ret = parseFloat(dData.retencion) || 0;
+          const pagado = parseFloat(dData.pagado) || 0;
+          const totalBruto = base + iva16 + iva8 + ret;
+          const saldo = Math.max(0, totalBruto - pagado);
+
+          const formatearNum = (num) => num.toFixed(2).replace('.', ',');
+
+          filasTransactions.push([
+            `"${semana.inicio} a ${semana.fin}"`,
+            `"${dData.fechaOperacion || dk}"`,
+            `"${dData.tipoDocumento || 'Factura'}"`,
+            `"${dData.numeroFactura || '-'}"`,
+            formatearNum(base),
+            formatearNum(iva16),
+            formatearNum(iva8),
+            formatearNum(ret),
+            formatearNum(totalBruto),
+            formatearNum(pagado),
+            formatearNum(saldo),
+            `"${dData.referencia || '-'}"`,
+            `"${(dData.observaciones || '').replace(/\n/g, ' ')}"`
+          ]);
+        }
+      });
+    });
+
+    const csvContent = [
+      titular,
+      subTitular,
+      '',
+      headers.join(';'),
+      ...filasTransactions.map(f => f.join(';'))
+    ].join('\n');
+
+    const universalBOM = "\uFEFF";
+    const blob = new Blob([universalBOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Estado_Cuenta_${p.nombre.replace(/\s+/g, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   // Eliminar proveedor
   const eliminarProveedor = async (id) => {
     if (window.confirm('¿Está seguro de que desea eliminar este proveedor?')) {
@@ -869,6 +941,13 @@ const CuentasPorPagar = () => {
                       </div>
                     </td>
                     <td className="acciones">
+                      <button 
+                        className="btn btn-descargar-individual"
+                        onClick={() => descargarReporteProveedorCSV(proveedor)}
+                        title="Descargar Estado de Cuenta Completo"
+                      >
+                        📥 Reporte
+                      </button>
                       <button 
                         className="btn btn-eliminar"
                         onClick={() => eliminarProveedor(proveedor.id)}

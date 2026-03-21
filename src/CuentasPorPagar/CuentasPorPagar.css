@@ -1139,3 +1139,24 @@
 .btn-reporte-anual:active {
   transform: translateY(0);
 }
+
+.btn-descargar-individual {
+  background: rgba(16, 185, 129, 0.1);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.btn-descargar-individual:hover {
+  background: #10b981;
+  color: white;
+  transform: translateY(-1px);
+}
