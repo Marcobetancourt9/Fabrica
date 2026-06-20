@@ -13,6 +13,8 @@ const CuentasPorPagar = () => {
   });
   const [filtro, setFiltro] = useState('');
   const [semanaFiltro, setSemanaFiltro] = useState('');
+  const [mesFiltro, setMesFiltro] = useState('');
+  const [diaFiltro, setDiaFiltro] = useState('');
   const [semanas, setSemanas] = useState([]);
   const [mostrarModal, setMostrarModal] = useState(false);
   const [nuevaSemana, setNuevaSemana] = useState({ inicio: '', fin: '' });
@@ -601,14 +603,78 @@ const CuentasPorPagar = () => {
   const proveedoresFiltrados = proveedores.filter(proveedor => {
     const coincideNombre = proveedor.nombre.toLowerCase().includes(filtro.toLowerCase());
     
-    if (!semanaFiltro) return coincideNombre;
+    // Filtro por semana específica
+    if (semanaFiltro) {
+      const tieneDeudaEnSemana = proveedor.deudas?.some(deuda => deuda.semana === semanaFiltro) || 
+                                !!proveedor.registroDiario?.[semanaFiltro];
+      if (!tieneDeudaEnSemana) return false;
+    }
+
+    // Filtro por mes (revisar todas las semanas del mes)
+    if (mesFiltro) {
+      const tieneActividadEnMes = semanas.some(s => {
+        const [d, m, a] = s.inicio.split('/').map(Number);
+        if (m === parseInt(mesFiltro)) {
+          const totales = obtenerTotalesSemana(proveedor, s.key);
+          return totales.monto > 0 || totales.pagado > 0;
+        }
+        return false;
+      });
+      if (!tieneActividadEnMes) return false;
+    }
+
+    // Filtro por día específico (revisar en registroDiario)
+    if (diaFiltro) {
+      // diaFiltro viene en formato YYYY-MM-DD
+      let tieneRegistroEseDia = false;
+      if (proveedor.registroDiario) {
+        Object.values(proveedor.registroDiario).forEach(diaRecords => {
+          if (diaRecords[diaFiltro]) {
+             const d = diaRecords[diaFiltro];
+             if ((parseFloat(d.monto) || 0) > 0 || (parseFloat(d.pagado) || 0) > 0) {
+               tieneRegistroEseDia = true;
+             }
+          }
+        });
+      }
+      if (!tieneRegistroEseDia) return false;
+    }
     
-    const tieneDeudaEnSemana = proveedor.deudas.some(deuda => 
-      deuda.semana === semanaFiltro
-    );
-    
-    return coincideNombre && tieneDeudaEnSemana;
+    return coincideNombre;
   });
+
+  // Filtrar las SEMANAS (columnas) que se muestran en la tabla
+  const semanasAMostrar = semanas.filter(semana => {
+    // Si hay filtro de semana específica
+    if (semanaFiltro && semana.key !== semanaFiltro) return false;
+
+    // Si hay filtro de mes
+    if (mesFiltro) {
+      const [d, m, a] = semana.inicio.split('/').map(Number);
+      if (m !== parseInt(mesFiltro)) return false;
+    }
+
+    // Si hay filtro de día específico
+    if (diaFiltro) {
+      // diaFiltro es YYYY-MM-DD. Comprobamos si el día cae dentro de esta semana
+      const [d, m, a] = semana.inicio.split('/').map(Number);
+      const fInicio = new Date(a, m - 1, d);
+      const fFin = new Date(fInicio);
+      fFin.setDate(fFin.getDate() + 6);
+      
+      const fDia = new Date(diaFiltro + 'T00:00:00'); // Evitar problemas de zona horaria
+      if (fDia < fInicio || fDia > fFin) return false;
+    }
+
+    return true;
+  });
+
+  const limpiarFiltros = () => {
+    setFiltro('');
+    setSemanaFiltro('');
+    setMesFiltro('');
+    setDiaFiltro('');
+  };
 
   // Calcular saldo pendiente por semana
   const calcularSaldoPendiente = (deuda) => {
@@ -750,6 +816,41 @@ const CuentasPorPagar = () => {
               ))}
             </select>
           </div>
+
+          <div className="filtro-select">
+            <span className="icon">🌓</span>
+            <select
+              value={mesFiltro}
+              onChange={(e) => setMesFiltro(e.target.value)}
+            >
+              <option value="">Cualquier Mes</option>
+              <option value="1">Enero</option>
+              <option value="2">Febrero</option>
+              <option value="3">Marzo</option>
+              <option value="4">Abril</option>
+              <option value="5">Mayo</option>
+              <option value="6">Junio</option>
+              <option value="7">Julio</option>
+              <option value="8">Agosto</option>
+              <option value="9">Septiembre</option>
+              <option value="10">Octubre</option>
+              <option value="11">Noviembre</option>
+              <option value="12">Diciembre</option>
+            </select>
+          </div>
+
+          <div className="filtro-date">
+            <label className="d-label">Ver Día:</label>
+            <input 
+              type="date" 
+              value={diaFiltro} 
+              onChange={(e) => setDiaFiltro(e.target.value)}
+            />
+          </div>
+
+          <button className="btn-limpiar" onClick={limpiarFiltros} title="Limpiar todos los filtros">
+            🔄 Reiniciar
+          </button>
         </div>
         
         <div className="acciones">
@@ -841,7 +942,7 @@ const CuentasPorPagar = () => {
           <thead>
             <tr>
               <th className="proveedor-header">Proveedor</th>
-              {semanas.map(semana => (
+              {semanasAMostrar.map(semana => (
                 <th key={semana.key} className="semana-header">
                   <div className="semana-titulo">
                     <span>{semana.inicio}</span>
@@ -892,7 +993,7 @@ const CuentasPorPagar = () => {
                       <span className="info-tag">VER FICHA</span>
                     </div>
                   </td>
-                  {semanas.map(semana => {
+                  {semanasAMostrar.map(semana => {
                     const totales = obtenerTotalesSemana(proveedor, semana.key);
                     const deudaMeta = proveedor.deudas?.find(d => d.semana === semana.key) || {};
                     
@@ -959,7 +1060,7 @@ const CuentasPorPagar = () => {
               ))
             ) : (
               <tr>
-                <td colSpan={semanas.length + 5} className="sin-resultados">
+                <td colSpan={semanasAMostrar.length + 5} className="sin-resultados">
                   {proveedores.length === 0 ? 'No hay proveedores registrados' : 'No se encontraron resultados'}
                 </td>
               </tr>
@@ -970,7 +1071,7 @@ const CuentasPorPagar = () => {
           <tfoot className="tabla-footer">
             <tr>
               <td className="footer-label">TOTAL SEMANAL:</td>
-              {semanas.map(semana => {
+              {semanasAMostrar.map(semana => {
                 const totalSemana = proveedoresFiltrados.reduce((sum, p) => {
                   return sum + obtenerTotalesSemana(p, semana.key).saldo;
                 }, 0);
