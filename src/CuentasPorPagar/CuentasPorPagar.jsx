@@ -199,7 +199,7 @@ const CuentasPorPagar = () => {
       
       diasSemana.forEach(dk => {
         const d = registroSemana[dk];
-        if (d && (parseFloat(d.monto) > 0 || parseFloat(d.pagado) > 0)) {
+        if (d && ((parseFloat(d.monto) || 0) !== 0 || (parseFloat(d.pagado) || 0) !== 0)) {
           const base = parseFloat(d.monto) || 0;
           const iva16 = parseFloat(d.iva16) || 0;
           const iva8 = parseFloat(d.iva8) || 0;
@@ -364,7 +364,7 @@ const CuentasPorPagar = () => {
         const dk = fechaBase.toISOString().split('T')[0];
         
         const dData = registroSemana[dk];
-        if (dData && (parseFloat(dData.monto) > 0 || parseFloat(dData.pagado) > 0)) {
+        if (dData && ((parseFloat(dData.monto) || 0) !== 0 || (parseFloat(dData.pagado) || 0) !== 0)) {
           const base = parseFloat(dData.monto) || 0;
           const iva16 = parseFloat(dData.iva16) || 0;
           const iva8 = parseFloat(dData.iva8) || 0;
