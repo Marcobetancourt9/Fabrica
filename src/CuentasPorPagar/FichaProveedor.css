@@ -315,13 +315,25 @@
 
 .f-field { display: flex; flex-direction: column; gap: 8px; }
 .f-field label { color: #94a3b8; font-size: 0.8rem; margin-left: 2px; }
-.f-field input { 
+.f-field input, .f-field select { 
   background: rgba(255, 255, 255, 0.02); 
   border: 1px solid rgba(255, 255, 255, 0.08); 
   padding: 12px; 
   border-radius: 10px; 
   color: white; 
   font-size: 0.95rem; 
+  outline: none;
+  transition: all 0.3s;
+}
+
+.f-field select option {
+  background: #0f172a;
+  color: white;
+}
+
+.f-field select:focus {
+  border-color: #fbbf24;
+  background: rgba(251, 191, 36, 0.05);
 }
 
 .f-field.calc input { background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.2); color: #10b981; font-weight: 700; }

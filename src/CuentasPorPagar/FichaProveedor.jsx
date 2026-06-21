@@ -59,37 +59,47 @@ const FichaProveedor = ({
     if (!nuevoRegistro[semanaKey][diaKey]) nuevoRegistro[semanaKey][diaKey] = {};
 
     const registroDia = { ...nuevoRegistro[semanaKey][diaKey] };
-    registroDia[campo] = valor;
+    
+    let nuevoValor = valor;
 
-    // Auto-cálculo de IVA según tasa seleccionada
-    if (campo === 'monto') {
-      const montoNum = parseFloat(valor) || 0;
-      const tasa = registroDia.tasaIva || '16';
-      if (tasa === '16') {
-        registroDia.iva16 = (montoNum * 0.16).toFixed(2);
-        registroDia.iva8 = '0';
-      } else if (tasa === '8') {
-        registroDia.iva16 = '0';
-        registroDia.iva8 = (montoNum * 0.08).toFixed(2);
-      } else {
-        registroDia.iva16 = '0';
-        registroDia.iva8 = '0';
+    // Si cambia el tipo de documento, ajustar el signo del monto y la retención existentes
+    if (campo === 'tipoDocumento') {
+      const esResta = valor === 'Nota de Crédito' || valor === 'Pago';
+      if (registroDia.monto) {
+        const valAbs = Math.abs(parseFloat(registroDia.monto) || 0);
+        registroDia.monto = (esResta ? -valAbs : valAbs).toString();
+      }
+      if (registroDia.retencion) {
+        const valAbs = Math.abs(parseFloat(registroDia.retencion) || 0);
+        registroDia.retencion = (esResta ? -valAbs : valAbs).toString();
       }
     }
 
-    // Recalcular IVA al cambiar la tasa
-    if (campo === 'tasaIva') {
-      const montoNum = parseFloat(registroDia.monto) || 0;
-      if (valor === '16') {
-        registroDia.iva16 = (montoNum * 0.16).toFixed(2);
-        registroDia.iva8 = '0';
-      } else if (valor === '8') {
-        registroDia.iva16 = '0';
-        registroDia.iva8 = (montoNum * 0.08).toFixed(2);
-      } else {
-        registroDia.iva16 = '0';
-        registroDia.iva8 = '0';
+    // Si cambia el monto o retencion, forzar el signo según el tipo de documento actual
+    if (campo === 'monto' || campo === 'retencion') {
+      const tipo = registroDia.tipoDocumento || 'Factura';
+      const esResta = tipo === 'Nota de Crédito' || tipo === 'Pago';
+      if (valor !== '') {
+        const valAbs = Math.abs(parseFloat(valor) || 0);
+        const signVal = esResta ? -valAbs : valAbs;
+        nuevoValor = isNaN(signVal) ? valor : signVal.toString();
       }
+    }
+
+    registroDia[campo] = nuevoValor;
+
+    // Auto-cálculo de IVA según tasa seleccionada
+    const montoNum = parseFloat(registroDia.monto) || 0;
+    const tasa = registroDia.tasaIva || '16';
+    if (tasa === '16') {
+      registroDia.iva16 = (montoNum * 0.16).toFixed(2);
+      registroDia.iva8 = '0';
+    } else if (tasa === '8') {
+      registroDia.iva16 = '0';
+      registroDia.iva8 = (montoNum * 0.08).toFixed(2);
+    } else {
+      registroDia.iva16 = '0';
+      registroDia.iva8 = '0';
     }
 
     nuevoRegistro[semanaKey][diaKey] = registroDia;
@@ -211,7 +221,7 @@ const FichaProveedor = ({
                                             <option value="Nota de Entrega">Nota de Entrega</option>
                                             <option value="Nota de Débito">Nota de Débito</option>
                                             <option value="Nota de Crédito">Nota de Crédito</option>
-                                            <option value="Otro">Otro</option>
+                                            <option value="Pago">Pago</option>
                                           </select>
                                         </div>
                                         <div className="f-field">
