@@ -578,13 +578,25 @@ const CuentasPorPagar = () => {
       return;
     }
     
+    // Convertir de formato nativo date (YYYY-MM-DD) a DD/MM/YYYY
+    const formatearFecha = (fechaInput) => {
+      if (fechaInput.includes('-')) {
+        const [y, m, d] = fechaInput.split('-');
+        return `${d}/${m}/${y}`;
+      }
+      return fechaInput; // Por si viene ya con formato
+    };
+
+    const inicioFormateado = formatearFecha(nuevaSemana.inicio);
+    const finFormateado = formatearFecha(nuevaSemana.fin);
+    
     const regexFecha = /^\d{2}\/\d{2}\/\d{4}$/;
-    if (!regexFecha.test(nuevaSemana.inicio) || !regexFecha.test(nuevaSemana.fin)) {
-      alert('Formato de fecha inválido. Use dd/mm/aaaa');
+    if (!regexFecha.test(inicioFormateado) || !regexFecha.test(finFormateado)) {
+      alert('Formato de fecha inválido. Use el selector de calendario');
       return;
     }
     
-    const nuevaSemanaKey = `${nuevaSemana.inicio}-${nuevaSemana.fin}`;
+    const nuevaSemanaKey = `${inicioFormateado}-${finFormateado}`;
     
     if (semanas.some(s => s.key === nuevaSemanaKey)) {
       alert('Esta semana ya existe');
@@ -592,8 +604,8 @@ const CuentasPorPagar = () => {
     }
     
     const semana = {
-      inicio: nuevaSemana.inicio,
-      fin: nuevaSemana.fin,
+      inicio: inicioFormateado,
+      fin: finFormateado,
       key: nuevaSemanaKey
     };
     
@@ -699,6 +711,15 @@ const CuentasPorPagar = () => {
       
       const fDia = new Date(diaFiltro + 'T00:00:00'); // Evitar problemas de zona horaria
       if (fDia < fInicio || fDia > fFin) return false;
+    }
+
+    // Ocultar semanas que no tienen datos (monto o pagado) en ningún proveedor
+    if (!semanaFiltro) {
+      const tieneActividad = proveedores.some(p => {
+        const totales = obtenerTotalesSemana(p, semana.key);
+        return totales.monto !== 0 || totales.pagado !== 0;
+      });
+      if (!tieneActividad) return false;
     }
 
     return true;
@@ -917,19 +938,17 @@ const CuentasPorPagar = () => {
             <h3>Agregar Nueva Semana</h3>
             <div className="modal-inputs">
               <div className="input-group">
-                <label>Fecha de inicio (dd/mm/aaaa):</label>
+                <label>Fecha de inicio:</label>
                 <input
-                  type="text"
-                  placeholder="01/01/2025"
+                  type="date"
                   value={nuevaSemana.inicio}
                   onChange={(e) => setNuevaSemana({...nuevaSemana, inicio: e.target.value})}
                 />
               </div>
               <div className="input-group">
-                <label>Fecha de fin (dd/mm/aaaa):</label>
+                <label>Fecha de fin:</label>
                 <input
-                  type="text"
-                  placeholder="07/01/2025"
+                  type="date"
                   value={nuevaSemana.fin}
                   onChange={(e) => setNuevaSemana({...nuevaSemana, fin: e.target.value})}
                 />
