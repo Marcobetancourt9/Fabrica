@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import './FichaProveedor.css';
 
 const TIPO_DOC_CONFIG = {
@@ -27,54 +27,33 @@ const FichaProveedor = ({
     encargado: proveedor.encargado || '',
     registroDiario: proveedor.registroDiario || {}
   });
-  const [semanaAbierta, setSemanaAbierta] = useState(semanaAbiertaInicial);
-  const [diaAbierto, setDiaAbierto] = useState(null);
+
+  const [fechaActiva, setFechaActiva] = useState(new Date().toISOString().split('T')[0]);
+  const [tabActivo, setTabActivo] = useState('diario'); // 'diario' o 'historial'
+  const [mesHistorial, setMesHistorial] = useState(new Date().getMonth() + 1); // 1-12
 
   const esDocumentoResta = (tipo) => tipo === 'Nota de Crédito' || tipo === 'Pago';
 
-  const obtenerTotalesSemana = (semanaKey) => {
-    const registroSemana = datosDetalle.registroDiario[semanaKey] || {};
-    let montoTotal = 0;
-    let pagadoTotal = 0;
-    
-    Object.values(registroSemana).forEach(dia => {
-      const base = parseFloat(dia.monto) || 0;
-      const iva16 = parseFloat(dia.iva16) || 0;
-      const iva8 = parseFloat(dia.iva8) || 0;
-      const retencion = parseFloat(dia.retencion) || 0;
-      montoTotal += (base + iva16 + iva8 + retencion);
-      pagadoTotal += parseFloat(dia.pagado) || 0;
-    });
-
-    return { 
-      monto: montoTotal, 
-      pagado: pagadoTotal, 
-      saldo: Math.max(0, montoTotal - pagadoTotal) 
-    };
-  };
-
-  const obtenerDiasDeSemana = (semanaKey) => {
-    const [inicioStr] = semanaKey.split('-');
-    const [d, m, a] = inicioStr.split('/').map(Number);
-    const fechaInicio = new Date(a, m - 1, d);
-    
-    const dias = [];
-    for (let i = 0; i < 7; i++) {
-      const fecha = new Date(fechaInicio);
-      fecha.setDate(fechaInicio.getDate() + i);
-      const diaKey = fecha.toISOString().split('T')[0];
-      const diaLabel = fecha.toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'short' });
-      dias.push({ key: diaKey, label: diaLabel });
+  // Utils
+  const obtenerSemanaKeyDeFecha = (fechaStr) => {
+    const f = new Date(fechaStr + 'T00:00:00');
+    for (let s of semanas) {
+      const [d1, m1, a1] = s.inicio.split('/').map(Number);
+      const [d2, m2, a2] = s.fin.split('/').map(Number);
+      const fInicio = new Date(a1, m1 - 1, d1);
+      const fFin = new Date(a2, m2 - 1, d2);
+      fFin.setHours(23, 59, 59);
+      if (f >= fInicio && f <= fFin) {
+        return s.key;
+      }
     }
-    return dias;
+    return null; 
   };
 
-  // Función auxiliar para calcular los campos derivados de un registro de día
   const recalcularCamposDerivados = (registroDia) => {
     const montoNum = parseFloat(registroDia.monto) || 0;
     const tasa = registroDia.tasaIva || '16';
 
-    // Auto-cálculo de IVA según tasa seleccionada
     if (tasa === '16') {
       registroDia.iva16 = (montoNum * 0.16).toFixed(2);
       registroDia.iva8 = '0';
@@ -86,10 +65,8 @@ const FichaProveedor = ({
       registroDia.iva8 = '0';
     }
 
-    // Auto-cálculo de Retención Municipal (1.25% del monto base)
     registroDia.retencion = (Math.abs(montoNum) * 0.0125).toFixed(2);
 
-    // Auto-cálculo de Retención de IVA
     const montoIva = parseFloat(tasa === '16' ? registroDia.iva16 : (tasa === '8' ? registroDia.iva8 : '0')) || 0;
     const pctRetencionIva = registroDia.porcentajeRetencionIva || '75';
     if (tasa === '0') {
@@ -97,50 +74,18 @@ const FichaProveedor = ({
     } else {
       registroDia.retencionIva = (Math.abs(montoIva) * (parseFloat(pctRetencionIva) / 100)).toFixed(2);
     }
-
     return registroDia;
   };
 
-  const manejarCambioDiario = (semanaKey, diaKey, campo, valor) => {
-    const nuevoRegistro = { ...datosDetalle.registroDiario };
-    if (!nuevoRegistro[semanaKey]) nuevoRegistro[semanaKey] = {};
-    if (!nuevoRegistro[semanaKey][diaKey]) nuevoRegistro[semanaKey][diaKey] = {};
-
-    const registroDia = { ...nuevoRegistro[semanaKey][diaKey] };
-    
-    let nuevoValor = valor;
-
-    // Si cambia el tipo de documento, ajustar el signo del monto existente
-    if (campo === 'tipoDocumento') {
-      const esResta = esDocumentoResta(valor);
-      if (registroDia.monto) {
-        const valAbs = Math.abs(parseFloat(registroDia.monto) || 0);
-        registroDia.monto = (esResta ? -valAbs : valAbs).toString();
-      }
-    }
-
-    // Si cambia el monto, forzar el signo según el tipo de documento actual
-    if (campo === 'monto') {
-      const tipo = registroDia.tipoDocumento || 'Factura';
-      const esResta = esDocumentoResta(tipo);
-      if (valor !== '') {
-        const valAbs = Math.abs(parseFloat(valor) || 0);
-        const signVal = esResta ? -valAbs : valAbs;
-        nuevoValor = isNaN(signVal) ? valor : signVal.toString();
-      }
-    }
-
-    registroDia[campo] = nuevoValor;
-
-    // Recalcular todos los campos derivados (IVA, retenciones)
-    recalcularCamposDerivados(registroDia);
-
-    nuevoRegistro[semanaKey][diaKey] = registroDia;
-    setDatosDetalle({ ...datosDetalle, registroDiario: nuevoRegistro });
+  const getDocumentosDia = (fecha) => {
+    const semanaKey = obtenerSemanaKeyDeFecha(fecha);
+    if (!semanaKey) return [];
+    const data = datosDetalle.registroDiario[semanaKey]?.[fecha];
+    if (!data) return [];
+    if (Array.isArray(data)) return data;
+    return [{ id: 'legacy-' + fecha, ...data }];
   };
 
-  // Función de cálculo para el Total del Registro neto
-  // Total = (Monto + IVA) - Ret. Municipal - Retención de IVA
   const calcularTotalRegistro = (dData) => {
     const monto = parseFloat(dData.monto) || 0;
     const iva = (parseFloat(dData.iva16) || 0) + (parseFloat(dData.iva8) || 0);
@@ -148,6 +93,136 @@ const FichaProveedor = ({
     const retIva = parseFloat(dData.retencionIva) || 0;
     return (Math.abs(monto) + Math.abs(iva)) - retMunicipal - retIva;
   };
+
+  // Acciones
+  const crearDocumento = (tipoDoc) => {
+    const semanaKey = obtenerSemanaKeyDeFecha(fechaActiva);
+    if (!semanaKey) return alert("Fecha fuera de rango. Seleccione una fecha válida en las semanas configuradas.");
+    
+    const nuevoRegistro = { ...datosDetalle.registroDiario };
+    if (!nuevoRegistro[semanaKey]) nuevoRegistro[semanaKey] = {};
+    
+    let arr = nuevoRegistro[semanaKey][fechaActiva];
+    if (!arr) arr = [];
+    if (!Array.isArray(arr)) arr = [{ id: 'legacy-' + fechaActiva, ...arr }];
+
+    const newDoc = {
+      id: Date.now().toString(),
+      tipoDocumento: tipoDoc,
+      fechaOperacion: fechaActiva,
+      monto: '',
+      pagado: '',
+      tasaIva: tipoDoc === 'Pago' ? '0' : '16', // Por defecto los pagos son exentos
+      porcentajeRetencionIva: '75'
+    };
+    
+    // Lo guardamos ya pre-calculado
+    recalcularCamposDerivados(newDoc);
+
+    arr.unshift(newDoc); // Agregamos al inicio
+    nuevoRegistro[semanaKey][fechaActiva] = arr;
+    
+    setDatosDetalle({ ...datosDetalle, registroDiario: nuevoRegistro });
+  };
+
+  const eliminarDocumento = (docId) => {
+    if(!window.confirm('¿Seguro que desea eliminar este documento? Esta acción es irreversible tras guardar.')) return;
+    const semanaKey = obtenerSemanaKeyDeFecha(fechaActiva);
+    const nuevoRegistro = { ...datosDetalle.registroDiario };
+    let arr = nuevoRegistro[semanaKey][fechaActiva];
+    if (!Array.isArray(arr)) arr = [{ id: 'legacy-' + fechaActiva, ...arr }];
+    
+    nuevoRegistro[semanaKey][fechaActiva] = arr.filter(d => (d.id || 'legacy-'+fechaActiva) !== docId);
+    setDatosDetalle({ ...datosDetalle, registroDiario: nuevoRegistro });
+  };
+
+  const manejarCambioDoc = (docId, campo, valor) => {
+    const semanaKey = obtenerSemanaKeyDeFecha(fechaActiva);
+    const nuevoRegistro = { ...datosDetalle.registroDiario };
+    let arr = nuevoRegistro[semanaKey][fechaActiva];
+    if (!Array.isArray(arr)) arr = [{ id: 'legacy-' + fechaActiva, ...arr }];
+    
+    const newArr = arr.map(doc => {
+       const currId = doc.id || 'legacy-'+fechaActiva;
+       if (currId === docId) {
+          const updated = { ...doc };
+          let nuevoValor = valor;
+
+          if (campo === 'tipoDocumento') {
+            const esResta = esDocumentoResta(valor);
+            if (updated.monto) {
+              const valAbs = Math.abs(parseFloat(updated.monto) || 0);
+              updated.monto = (esResta ? -valAbs : valAbs).toString();
+            }
+          }
+
+          if (campo === 'monto') {
+            const tipo = updated.tipoDocumento || 'Factura';
+            const esResta = esDocumentoResta(tipo);
+            if (valor !== '') {
+              const valAbs = Math.abs(parseFloat(valor) || 0);
+              const signVal = esResta ? -valAbs : valAbs;
+              nuevoValor = isNaN(signVal) ? valor : signVal.toString();
+            }
+          }
+
+          updated[campo] = nuevoValor;
+          return recalcularCamposDerivados(updated);
+       }
+       return doc;
+    });
+    
+    nuevoRegistro[semanaKey][fechaActiva] = newArr;
+    setDatosDetalle({ ...datosDetalle, registroDiario: nuevoRegistro });
+  };
+
+  const cambiarDia = (dias) => {
+    const f = new Date(fechaActiva + 'T00:00:00');
+    f.setDate(f.getDate() + dias);
+    setFechaActiva(f.toISOString().split('T')[0]);
+  };
+
+  // Historial y Totales Generales
+  const getTodosLosDocumentos = () => {
+    const allDocs = [];
+    Object.values(datosDetalle.registroDiario).forEach(semana => {
+      Object.entries(semana).forEach(([diaKey, diaData]) => {
+         const arr = Array.isArray(diaData) ? diaData : [{ id: 'legacy-'+diaKey, ...diaData }];
+         arr.forEach(doc => {
+            if ((parseFloat(doc.monto) || 0) !== 0 || (parseFloat(doc.pagado) || 0) !== 0) {
+              allDocs.push({ ...doc, diaKey });
+            }
+         });
+      });
+    });
+    return allDocs.sort((a,b) => b.diaKey.localeCompare(a.diaKey));
+  };
+
+  const docsMes = getTodosLosDocumentos().filter(d => {
+    const [y, m] = d.diaKey.split('-');
+    return parseInt(m) === mesHistorial;
+  });
+
+  const totalesGenerales = getTodosLosDocumentos().reduce((acc, doc) => {
+    const base = parseFloat(doc.monto) || 0;
+    const sign = base < 0 ? -1 : 1;
+    const neto = ((Math.abs(base) + Math.abs(parseFloat(doc.iva16) || 0) + Math.abs(parseFloat(doc.iva8) || 0)) 
+                 - Math.abs(parseFloat(doc.retencion) || 0) - Math.abs(parseFloat(doc.retencionIva) || 0)) * sign;
+    acc.deuda += neto;
+    acc.pagado += parseFloat(doc.pagado) || 0;
+    return acc;
+  }, { deuda: 0, pagado: 0 });
+
+  const docsHoy = getDocumentosDia(fechaActiva);
+  const totalesHoy = docsHoy.reduce((acc, doc) => {
+    const base = parseFloat(doc.monto) || 0;
+    const sign = base < 0 ? -1 : 1;
+    const neto = calcularTotalRegistro(doc) * sign;
+    acc.neto += neto;
+    if (sign > 0) acc.sumas += neto;
+    else acc.restas += Math.abs(neto);
+    return acc;
+  }, { neto: 0, sumas: 0, restas: 0 });
 
   return (
     <div className="ficha-overlay">
@@ -162,325 +237,309 @@ const FichaProveedor = ({
           </button>
         </header>
 
-        <main className="ficha-content">
-          {/* Panel Lateral: Info General */}
+        <main className="ficha-content new-layout">
           <aside className="ficha-sidebar">
             <section className="info-general-panel">
               <h3>Datos Fiscales</h3>
               <div className="input-field-full">
                 <label>RIF / Identificación</label>
-                <input 
-                  type="text" 
-                  value={datosDetalle.rif} 
-                  onChange={(e) => setDatosDetalle({...datosDetalle, rif: e.target.value})}
-                  placeholder="J-00000000-0"
-                />
+                <input type="text" value={datosDetalle.rif} onChange={(e) => setDatosDetalle({...datosDetalle, rif: e.target.value})} placeholder="J-00000000-0" />
               </div>
               <div className="input-field-full">
                 <label>Persona Encargada</label>
-                <input 
-                  type="text" 
-                  value={datosDetalle.encargado} 
-                  onChange={(e) => setDatosDetalle({...datosDetalle, encargado: e.target.value})}
-                  placeholder="Nombre de contacto"
-                />
-              </div>
-            </section>
-
-            {/* Leyenda de tipos de documento */}
-            <section className="tipos-doc-legend">
-              <h3>Tipos de Documento</h3>
-              <div className="legend-grid">
-                {Object.entries(TIPO_DOC_CONFIG).map(([key, cfg]) => (
-                  <div key={key} className="legend-item" style={{ '--doc-color': cfg.color }}>
-                    <span className="legend-icon">{cfg.icon}</span>
-                    <div className="legend-info">
-                      <span className="legend-name">{cfg.label}</span>
-                      <span className={`legend-effect ${cfg.sumDeuda ? 'sum' : 'rest'}`}>
-                        {cfg.sumDeuda ? '▲ Suma deuda' : '▼ Resta deuda'}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                <input type="text" value={datosDetalle.encargado} onChange={(e) => setDatosDetalle({...datosDetalle, encargado: e.target.value})} placeholder="Nombre de contacto" />
               </div>
             </section>
 
             <div className="resumen-proveedor-card">
-              <h3>Total Acumulado</h3>
+              <h3>Saldo Global del Proveedor</h3>
               <div className="total-display">
                 <div className="resumen-row">
                   <span>Deuda Bruta:</span>
-                  <span className="val">${Object.keys(datosDetalle.registroDiario).reduce((acc, k) => acc + obtenerTotalesSemana(k).monto, 0).toLocaleString()}</span>
+                  <span className="val">${totalesGenerales.deuda.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
                 </div>
                 <div className="resumen-row">
                   <span>Pagado:</span>
-                  <span className="val green">${Object.keys(datosDetalle.registroDiario).reduce((acc, k) => acc + obtenerTotalesSemana(k).pagado, 0).toLocaleString()}</span>
+                  <span className="val green">${totalesGenerales.pagado.toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
                 </div>
                 <div className="resumen-row total">
                   <span>Saldo deudor:</span>
-                  <span className="val highlight">${(Object.keys(datosDetalle.registroDiario).reduce((acc, k) => acc + obtenerTotalesSemana(k).monto, 0) - Object.keys(datosDetalle.registroDiario).reduce((acc, k) => acc + obtenerTotalesSemana(k).pagado, 0)).toLocaleString()}</span>
+                  <span className="val highlight">${(Math.max(0, totalesGenerales.deuda - totalesGenerales.pagado)).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
                 </div>
               </div>
             </div>
           </aside>
 
-          {/* Panel Principal: Registro Diario */}
           <section className="ficha-main-area">
-            <div className="area-header">
-              <h2>Historial de Registro Diario</h2>
-              <p>Selecciona una semana para ver y editar los detalles específicos por día.</p>
+            {/* ─── Pestañas Principales ─── */}
+            <div className="tabs-container">
+              <button className={`tab-btn ${tabActivo === 'diario' ? 'active' : ''}`} onClick={() => setTabActivo('diario')}>
+                Registro Diario
+              </button>
+              <button className={`tab-btn ${tabActivo === 'historial' ? 'active' : ''}`} onClick={() => setTabActivo('historial')}>
+                Historial Mensual
+              </button>
             </div>
 
-            <div className="semanas-grid">
-              {semanas
-                .filter(s => s.key === semanaAbierta || (obtenerTotalesSemana(s.key).monto !== 0))
-                .map(semana => {
-                  const isOpen = semanaAbierta === semana.key;
-                  const totales = obtenerTotalesSemana(semana.key);
+            {tabActivo === 'diario' && (
+              <div className="tab-content diario-view">
+                {/* Selector de Fecha Central */}
+                <div className="date-navigator">
+                  <button onClick={() => cambiarDia(-1)} className="nav-btn">◀ Anterior</button>
+                  <div className="date-picker-wrapper">
+                    <label>Fecha Activa</label>
+                    <input type="date" value={fechaActiva} onChange={(e) => setFechaActiva(e.target.value)} className="date-main-input" />
+                  </div>
+                  <button onClick={() => cambiarDia(1)} className="nav-btn">Siguiente ▶</button>
+                </div>
 
-                  return (
-                    <div key={semana.key} className={`week-full-section ${isOpen ? 'open' : ''}`}>
-                      <div className="week-full-header" onClick={() => setSemanaAbierta(isOpen ? null : semana.key)}>
-                        <div className="info">
-                          <span className="icon">📅</span>
-                          <strong>{semana.inicio} - {semana.fin}</strong>
-                        </div>
-                        <div className="badges">
-                          <span className="b-monto">Deuda: ${totales.monto.toLocaleString()}</span>
-                          <span className={`b-saldo ${totales.saldo > 0 ? 'red' : 'green'}`}>Pendiente: ${totales.saldo.toLocaleString()}</span>
-                        </div>
-                        <span className="arrow">{isOpen ? '▼' : '▶'}</span>
-                      </div>
+                {/* Menú de Operaciones Maestras */}
+                <div className="operations-menu-card">
+                  <h3>Registrar Operación en el Día</h3>
+                  <div className="operations-buttons">
+                    {Object.entries(TIPO_DOC_CONFIG).map(([key, cfg]) => (
+                      <button key={key} className="op-btn" style={{ '--op-color': cfg.color }} onClick={() => crearDocumento(key)}>
+                        <span className="op-icon">{cfg.icon}</span>
+                        <span className="op-label">{cfg.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
 
-                      {isOpen && (
-                        <div className="days-full-list">
-                          {obtenerDiasDeSemana(semana.key).map(dia => {
-                            const isDiaOpen = diaAbierto === dia.key;
-                            const dData = datosDetalle.registroDiario[semana.key]?.[dia.key] || {};
-                            const hasData = (parseFloat(dData.monto) || 0) !== 0;
-                            const tipoDoc = dData.tipoDocumento || 'Factura';
-                            const tipoCfg = TIPO_DOC_CONFIG[tipoDoc] || TIPO_DOC_CONFIG['Factura'];
-                            const esResta = esDocumentoResta(tipoDoc);
-                            const tasaActual = dData.tasaIva || '16';
-                            const tasaCfg = TASA_IVA_CONFIG[tasaActual] || TASA_IVA_CONFIG['16'];
+                {/* Resumen del Día Actual */}
+                <div className="day-summary-card">
+                  <h3>Balance del Día: {fechaActiva.split('-').reverse().join('/')}</h3>
+                  <div className="day-stats">
+                    <div className="stat suma"><span>Suma Deuda:</span> <strong>+${totalesHoy.sumas.toLocaleString(undefined, {minimumFractionDigits: 2})}</strong></div>
+                    <div className="stat resta"><span>Resta Deuda:</span> <strong>-${totalesHoy.restas.toLocaleString(undefined, {minimumFractionDigits: 2})}</strong></div>
+                    <div className={`stat total ${totalesHoy.neto < 0 ? 'neg' : 'pos'}`}>
+                      <span>Neto Diario:</span>
+                      <strong>{totalesHoy.neto > 0 ? '+' : ''}${totalesHoy.neto.toLocaleString(undefined, {minimumFractionDigits: 2})}</strong>
+                    </div>
+                  </div>
+                </div>
 
-                            return (
-                                <div key={dia.key} className={`day-full-entry ${isDiaOpen ? 'active' : ''} ${hasData ? 'has-data' : ''}`}
-                                  style={hasData ? { '--entry-accent': tipoCfg.color } : {}}
-                                >
-                                  <div className="day-full-header" onClick={() => setDiaAbierto(isDiaOpen ? null : dia.key)}>
-                                    <div className="day-header-left">
-                                      <span className="name">{dia.label}</span>
-                                      {hasData && (
-                                        <span className="tipo-badge" style={{ '--badge-color': tipoCfg.color }}>
-                                          {tipoCfg.icon} {tipoCfg.label}
-                                        </span>
-                                      )}
+                {/* Lista de Documentos del Día */}
+                <div className="documents-list">
+                  {docsHoy.length === 0 ? (
+                    <div className="empty-day-state">
+                      <span className="empty-icon">📭</span>
+                      <p>No hay operaciones registradas para esta fecha.</p>
+                      <span>Usa los botones de arriba para crear una factura, pago o nota.</span>
+                    </div>
+                  ) : (
+                    docsHoy.map((dData, index) => {
+                      const docId = dData.id || 'legacy-'+fechaActiva;
+                      const tipoDoc = dData.tipoDocumento || 'Factura';
+                      const tipoCfg = TIPO_DOC_CONFIG[tipoDoc] || TIPO_DOC_CONFIG['Factura'];
+                      const esResta = esDocumentoResta(tipoDoc);
+                      const tasaActual = dData.tasaIva || '16';
+                      const tasaCfg = TASA_IVA_CONFIG[tasaActual] || TASA_IVA_CONFIG['16'];
+
+                      return (
+                        <div key={docId} className="document-card" style={{ '--doc-accent': tipoCfg.color }}>
+                          <div className="document-card-header">
+                            <div className="doc-title">
+                              <span className="doc-icon">{tipoCfg.icon}</span>
+                              <h4>{tipoDoc}</h4>
+                              <span className={`doc-effect ${esResta ? 'resta' : 'suma'}`}>{esResta ? 'Resta Deuda' : 'Suma Deuda'}</span>
+                            </div>
+                            <button className="btn-delete-doc" onClick={() => eliminarDocumento(docId)}>🗑️ Eliminar</button>
+                          </div>
+
+                          <div className="document-card-body">
+                            <div className="form-grid-3">
+                              <div className="f-field">
+                                <label>Número de Control</label>
+                                <input type="text" value={dData.numeroFactura || ''} onChange={(e) => manejarCambioDoc(docId, 'numeroFactura', e.target.value)} placeholder="0001" />
+                              </div>
+                              <div className="f-field">
+                                <label>Monto Base {esResta && '(Se aplicará negativo)'}</label>
+                                <div className="input-with-sign">
+                                  <span className={`sign-indicator ${esResta ? 'negative' : 'positive'}`}>{esResta ? '−' : '+'}</span>
+                                  <input 
+                                    type="number" 
+                                    value={dData.monto ? Math.abs(parseFloat(dData.monto)).toString() : ''} 
+                                    onChange={(e) => manejarCambioDoc(docId, 'monto', e.target.value)} 
+                                    placeholder="0.00" 
+                                    className={esResta ? 'input-resta' : ''}
+                                  />
+                                </div>
+                              </div>
+                              <div className="f-field">
+                                <label>Pagado</label>
+                                <input type="number" value={dData.pagado || ''} onChange={(e) => manejarCambioDoc(docId, 'pagado', e.target.value)} placeholder="0.00" />
+                              </div>
+                            </div>
+
+                            <div className="form-grid-3">
+                              {/* ─── Selector de IVA ─── */}
+                              <div className="f-field iva-field">
+                                <label>Tasa de IVA</label>
+                                <div className="iva-selector">
+                                  {Object.entries(TASA_IVA_CONFIG).map(([key, cfg]) => (
+                                    <button
+                                      key={key}
+                                      type="button"
+                                      className={`iva-option ${tasaActual === key ? 'selected' : ''}`}
+                                      style={{ '--iva-color': cfg.color }}
+                                      onClick={() => manejarCambioDoc(docId, 'tasaIva', key)}
+                                    >
+                                      <span className="iva-icon">{cfg.icon}</span>
+                                      <span className="iva-label">{cfg.label}</span>
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                              {/* ─── Ret. Municipal auto-calculada (1.25%) ─── */}
+                              <div className="f-field calc">
+                                <label>Ret. Municipal (1,25%)</label>
+                                <div className="auto-calc-display ret-municipal">
+                                  <span className="auto-calc-icon">🏛️</span>
+                                  <span className="auto-calc-value">${parseFloat(dData.retencion || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                  <span className="auto-calc-label">Auto</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className={`form-grid-${tasaActual !== '0' ? '2' : '2'}`}>
+                              <div className="f-field calc">
+                                <label>Monto IVA (Auto-calculado)</label>
+                                <div className="iva-result" style={{ '--iva-result-color': tasaCfg.color }}>
+                                  <span className="iva-result-icon">{tasaCfg.icon}</span>
+                                  <span className="iva-result-value">
+                                    {tasaActual === '16' ? `$${dData.iva16 || '0.00'}` : (tasaActual === '8' ? `$${dData.iva8 || '0.00'}` : '$0.00')}
+                                  </span>
+                                  <span className="iva-result-label">{tasaCfg.label}</span>
+                                </div>
+                              </div>
+
+                              {/* ─── Retención de IVA ─── */}
+                              {tasaActual !== '0' && (
+                                <div className="f-field calc retencion-iva-field">
+                                  <label>Retención de IVA</label>
+                                  <div className="retencion-iva-container">
+                                    <div className="retencion-pct-selector">
+                                      <button
+                                        type="button"
+                                        className={`pct-option ${(dData.porcentajeRetencionIva || '75') === '75' ? 'selected' : ''}`}
+                                        onClick={() => manejarCambioDoc(docId, 'porcentajeRetencionIva', '75')}
+                                      >
+                                        75%
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={`pct-option ${(dData.porcentajeRetencionIva || '75') === '100' ? 'selected' : ''}`}
+                                        onClick={() => manejarCambioDoc(docId, 'porcentajeRetencionIva', '100')}
+                                      >
+                                        100%
+                                      </button>
                                     </div>
-                                    <div className="day-header-right">
-                                      {hasData && (
-                                        <span className={`m-total ${esResta ? 'resta' : ''}`}>
-                                          {esResta ? '−' : '+'} ${calcularTotalRegistro(dData).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                        </span>
-                                      )}
-                                      <button className="btn-edit-inline">{isDiaOpen ? 'Ocultar' : 'Editar'}</button>
+                                    <div className="auto-calc-display ret-iva">
+                                      <span className="auto-calc-icon">🧾</span>
+                                      <span className="auto-calc-value">${parseFloat(dData.retencionIva || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                      <span className="auto-calc-label">{dData.porcentajeRetencionIva || '75'}% del IVA</span>
                                     </div>
                                   </div>
-
-                                  {isDiaOpen && (
-                                    <div className="day-full-form">
-                                      {/* ─── Selector Principal de Tipo de Documento ─── */}
-                                      <div className="tipo-doc-selector">
-                                        <label className="tipo-doc-label">Tipo de Documento</label>
-                                        <div className="tipo-doc-cards">
-                                          {Object.entries(TIPO_DOC_CONFIG).map(([key, cfg]) => (
-                                            <button
-                                              key={key}
-                                              type="button"
-                                              className={`tipo-doc-card ${tipoDoc === key ? 'selected' : ''}`}
-                                              style={{ '--card-color': cfg.color }}
-                                              onClick={() => manejarCambioDiario(semana.key, dia.key, 'tipoDocumento', key)}
-                                            >
-                                              <span className="card-icon">{cfg.icon}</span>
-                                              <span className="card-name">{cfg.label}</span>
-                                              <span className={`card-effect ${cfg.sumDeuda ? 'sum' : 'rest'}`}>
-                                                {cfg.sumDeuda ? '▲ Deuda' : '▼ Deuda'}
-                                              </span>
-                                            </button>
-                                          ))}
-                                        </div>
-                                      </div>
-
-                                      {/* Indicador visual del efecto */}
-                                      <div className={`efecto-indicator ${esResta ? 'resta' : 'suma'}`}>
-                                        <span className="efecto-icon">{esResta ? '📉' : '📈'}</span>
-                                        <span className="efecto-text">
-                                          {esResta 
-                                            ? 'Este documento RESTA deuda — el monto se aplica como negativo' 
-                                            : 'Este documento SUMA deuda — el monto se acumula al saldo'}
-                                        </span>
-                                      </div>
-
-                                      <div className="form-grid-3">
-                                        <div className="f-field">
-                                          <label>Número de Factura/Control</label>
-                                          <input type="text" value={dData.numeroFactura || ''} onChange={(e) => manejarCambioDiario(semana.key, dia.key, 'numeroFactura', e.target.value)} placeholder="0001" />
-                                        </div>
-                                        <div className="f-field">
-                                          <label>Fecha de Operación</label>
-                                          <input type="date" value={dData.fechaOperacion || dia.key} onChange={(e) => manejarCambioDiario(semana.key, dia.key, 'fechaOperacion', e.target.value)} />
-                                        </div>
-                                        <div className="f-field">
-                                          <label>{esResta ? 'Monto a Descontar' : 'Monto Base'}</label>
-                                          <div className="input-with-sign">
-                                            <span className={`sign-indicator ${esResta ? 'negative' : 'positive'}`}>
-                                              {esResta ? '−' : '+'}
-                                            </span>
-                                            <input 
-                                              type="number" 
-                                              value={dData.monto ? Math.abs(parseFloat(dData.monto)).toString() : ''} 
-                                              onChange={(e) => manejarCambioDiario(semana.key, dia.key, 'monto', e.target.value)} 
-                                              placeholder="0.00" 
-                                              className={esResta ? 'input-resta' : ''}
-                                            />
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      <div className="form-grid-3">
-                                        <div className="f-field">
-                                          <label>Pagado</label>
-                                          <input type="number" value={dData.pagado || ''} onChange={(e) => manejarCambioDiario(semana.key, dia.key, 'pagado', e.target.value)} placeholder="0.00" />
-                                        </div>
-                                        {/* ─── Selector de IVA con diseño premium ─── */}
-                                        <div className="f-field iva-field">
-                                          <label>Tasa de IVA</label>
-                                          <div className="iva-selector">
-                                            {Object.entries(TASA_IVA_CONFIG).map(([key, cfg]) => (
-                                              <button
-                                                key={key}
-                                                type="button"
-                                                className={`iva-option ${tasaActual === key ? 'selected' : ''}`}
-                                                style={{ '--iva-color': cfg.color }}
-                                                onClick={() => manejarCambioDiario(semana.key, dia.key, 'tasaIva', key)}
-                                              >
-                                                <span className="iva-icon">{cfg.icon}</span>
-                                                <span className="iva-label">{cfg.label}</span>
-                                              </button>
-                                            ))}
-                                          </div>
-                                        </div>
-                                        {/* ─── Ret. Municipal auto-calculada (1.25%) ─── */}
-                                        <div className="f-field calc">
-                                          <label>Ret. Municipal (1,25%)</label>
-                                          <div className="auto-calc-display ret-municipal">
-                                            <span className="auto-calc-icon">🏛️</span>
-                                            <span className="auto-calc-value">${parseFloat(dData.retencion || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                            <span className="auto-calc-label">Auto</span>
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      <div className={`form-grid-${tasaActual !== '0' ? '2' : '2'}`}>
-                                        <div className="f-field calc">
-                                          <label>Monto IVA (Auto-calculado)</label>
-                                          <div className="iva-result" style={{ '--iva-result-color': tasaCfg.color }}>
-                                            <span className="iva-result-icon">{tasaCfg.icon}</span>
-                                            <span className="iva-result-value">
-                                              {tasaActual === '16' 
-                                                ? `$${dData.iva16 || '0.00'}` 
-                                                : (tasaActual === '8' 
-                                                  ? `$${dData.iva8 || '0.00'}` 
-                                                  : '$0.00')}
-                                            </span>
-                                            <span className="iva-result-label">{tasaCfg.label}</span>
-                                          </div>
-                                        </div>
-
-                                        {/* ─── Retención de IVA (solo si IVA no es Exento) ─── */}
-                                        {tasaActual !== '0' && (
-                                          <div className="f-field calc retencion-iva-field">
-                                            <label>Retención de IVA</label>
-                                            <div className="retencion-iva-container">
-                                              <div className="retencion-pct-selector">
-                                                <button
-                                                  type="button"
-                                                  className={`pct-option ${(dData.porcentajeRetencionIva || '75') === '75' ? 'selected' : ''}`}
-                                                  onClick={() => manejarCambioDiario(semana.key, dia.key, 'porcentajeRetencionIva', '75')}
-                                                >
-                                                  75%
-                                                </button>
-                                                <button
-                                                  type="button"
-                                                  className={`pct-option ${(dData.porcentajeRetencionIva || '75') === '100' ? 'selected' : ''}`}
-                                                  onClick={() => manejarCambioDiario(semana.key, dia.key, 'porcentajeRetencionIva', '100')}
-                                                >
-                                                  100%
-                                                </button>
-                                              </div>
-                                              <div className="auto-calc-display ret-iva">
-                                                <span className="auto-calc-icon">🧾</span>
-                                                <span className="auto-calc-value">${parseFloat(dData.retencionIva || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                                <span className="auto-calc-label">{dData.porcentajeRetencionIva || '75'}% del IVA</span>
-                                              </div>
-                                            </div>
-                                          </div>
-                                        )}
-                                      </div>
-
-                                      {/* ─── Total del Registro (Neto) ─── */}
-                                      <div className="f-field total-dia-field">
-                                        <label>Total del Registro <span className="formula-hint">(Monto + IVA) − Ret. Municipal − Ret. IVA</span></label>
-                                        <div className={`total-dia-display ${esResta ? 'resta' : 'suma'}`}>
-                                          <span className="total-dia-sign">{esResta ? '−' : '+'}</span>
-                                          <span className="total-dia-value">
-                                            ${calcularTotalRegistro(dData).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                          </span>
-                                          <div className="total-breakdown">
-                                            <span className="breakdown-item">Base: ${Math.abs(parseFloat(dData.monto) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                            <span className="breakdown-item">+ IVA: ${(Math.abs(parseFloat(dData.iva16) || 0) + Math.abs(parseFloat(dData.iva8) || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                            <span className="breakdown-item subtract">− Ret.M: ${parseFloat(dData.retencion || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                            <span className="breakdown-item subtract">− Ret.IVA: ${parseFloat(dData.retencionIva || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      <div className="form-grid-2">
-                                        <div className="f-field">
-                                          <label>Referencia / Método de Pago</label>
-                                          <input 
-                                            type="text" 
-                                            value={dData.referencia || ''} 
-                                            onChange={(e) => manejarCambioDiario(semana.key, dia.key, 'referencia', e.target.value)} 
-                                            placeholder="Efectivo, Transferencia #0000, Pago Móvil..." 
-                                          />
-                                        </div>
-                                        <div className="f-field">
-                                          <label>URL Soporte (Opcional)</label>
-                                          <input type="text" value={dData.facturaUrl || ''} onChange={(e) => manejarCambioDiario(semana.key, dia.key, 'facturaUrl', e.target.value)} placeholder="https://..." />
-                                        </div>
-                                      </div>
-
-                                      <div className="f-field">
-                                        <label>Observaciones</label>
-                                        <textarea 
-                                          value={dData.observaciones || ''} 
-                                          onChange={(e) => manejarCambioDiario(semana.key, dia.key, 'observaciones', e.target.value)}
-                                          placeholder="Detalles adicionales sobre esta transacción..."
-                                          className="observaciones-textarea"
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
                                 </div>
-                            );
-                          })}
+                              )}
+                            </div>
+
+                            {/* ─── Total del Registro (Neto) ─── */}
+                            <div className="f-field total-dia-field">
+                              <label>Total del Registro <span className="formula-hint">(Monto + IVA) − Ret. Municipal − Ret. IVA</span></label>
+                              <div className={`total-dia-display ${esResta ? 'resta' : 'suma'}`}>
+                                <span className="total-dia-sign">{esResta ? '−' : '+'}</span>
+                                <span className="total-dia-value">
+                                  ${calcularTotalRegistro(dData).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </span>
+                                <div className="total-breakdown">
+                                  <span className="breakdown-item">Base: ${Math.abs(parseFloat(dData.monto) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                  <span className="breakdown-item">+ IVA: ${(Math.abs(parseFloat(dData.iva16) || 0) + Math.abs(parseFloat(dData.iva8) || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                  <span className="breakdown-item subtract">− Ret.M: ${parseFloat(dData.retencion || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                  <span className="breakdown-item subtract">− Ret.IVA: ${parseFloat(dData.retencionIva || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                </div>
+                              </div>
+                            </div>
+
+                            <div className="form-grid-2">
+                              <div className="f-field">
+                                <label>Referencia / Método de Pago</label>
+                                <input type="text" value={dData.referencia || ''} onChange={(e) => manejarCambioDoc(docId, 'referencia', e.target.value)} placeholder="Efectivo, Transferencia #0000, Pago Móvil..." />
+                              </div>
+                              <div className="f-field">
+                                <label>URL Soporte (Opcional)</label>
+                                <input type="text" value={dData.facturaUrl || ''} onChange={(e) => manejarCambioDoc(docId, 'facturaUrl', e.target.value)} placeholder="https://..." />
+                              </div>
+                            </div>
+
+                            <div className="f-field">
+                              <label>Observaciones</label>
+                              <textarea value={dData.observaciones || ''} onChange={(e) => manejarCambioDoc(docId, 'observaciones', e.target.value)} placeholder="Detalles adicionales sobre esta transacción..." className="observaciones-textarea" />
+                            </div>
+                          </div>
                         </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+
+            {tabActivo === 'historial' && (
+              <div className="tab-content historial-view">
+                <div className="historial-header">
+                  <h3>Historial de Operaciones</h3>
+                  <div className="mes-selector">
+                    <label>Mes:</label>
+                    <select value={mesHistorial} onChange={(e) => setMesHistorial(Number(e.target.value))}>
+                      {[1,2,3,4,5,6,7,8,9,10,11,12].map(m => (
+                        <option key={m} value={m}>{new Date(2025, m-1, 1).toLocaleString('es', { month: 'long' }).toUpperCase()}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="historial-table-container">
+                  <table className="historial-table">
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Tipo</th>
+                        <th>Nro Control</th>
+                        <th>Total Neto</th>
+                        <th>Pagado</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {docsMes.length === 0 ? (
+                        <tr><td colSpan="5" className="text-center">No hay operaciones en este mes.</td></tr>
+                      ) : (
+                        docsMes.map((doc, idx) => {
+                          const esResta = esDocumentoResta(doc.tipoDocumento);
+                          const total = calcularTotalRegistro(doc);
+                          return (
+                            <tr key={idx}>
+                              <td>{doc.fechaOperacion || doc.diaKey}</td>
+                              <td>
+                                <span className={`tipo-badge-table ${esResta ? 'resta' : 'suma'}`} style={{'--badge-color': (TIPO_DOC_CONFIG[doc.tipoDocumento] || TIPO_DOC_CONFIG['Factura']).color}}>
+                                  {doc.tipoDocumento || 'Factura'}
+                                </span>
+                              </td>
+                              <td>{doc.numeroFactura || '-'}</td>
+                              <td className={`monto-col ${esResta ? 'neg' : 'pos'}`}>
+                                {esResta ? '-' : '+'}${total.toLocaleString(undefined, {minimumFractionDigits: 2})}
+                              </td>
+                              <td>${parseFloat(doc.pagado || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                            </tr>
+                          );
+                        })
                       )}
-                    </div>
-                  );
-                })}
-            </div>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </section>
         </main>
 

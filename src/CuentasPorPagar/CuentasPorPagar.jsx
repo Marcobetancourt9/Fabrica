@@ -86,14 +86,25 @@ const CuentasPorPagar = () => {
     
     // Sumar montos de los días incluyendo impuestos y retenciones
     Object.values(registroSemana).forEach(dia => {
-      const base = parseFloat(dia.monto) || 0;
-      const iva16 = parseFloat(dia.iva16) || 0;
-      const iva8 = parseFloat(dia.iva8) || 0;
-      const retencion = parseFloat(dia.retencion) || 0;
+      const registrosDia = Array.isArray(dia) ? dia : [dia];
       
-      const totalDia = base + iva16 + iva8 + retencion;
-      montoTotal += totalDia;
-      pagadoTotal += parseFloat(dia.pagado) || 0;
+      registrosDia.forEach(d => {
+        // En los registros, la retención se almacena en positivo o negativo dependiendo del tipo de doc,
+        // pero la regla general es: Monto + IVA - RetMunicipal - RetIVA
+        // Para simplificar, usaremos los valores absolutos y el signo del monto base.
+        const base = parseFloat(d.monto) || 0;
+        const sign = base < 0 ? -1 : 1;
+        const absBase = Math.abs(base);
+        const absIva16 = Math.abs(parseFloat(d.iva16) || 0);
+        const absIva8 = Math.abs(parseFloat(d.iva8) || 0);
+        const absRetencion = Math.abs(parseFloat(d.retencion) || 0);
+        const absRetencionIva = Math.abs(parseFloat(d.retencionIva) || 0);
+        
+        const totalDocumentoNeto = (absBase + absIva16 + absIva8) - absRetencion - absRetencionIva;
+        
+        montoTotal += (totalDocumentoNeto * sign);
+        pagadoTotal += parseFloat(d.pagado) || 0;
+      });
     });
 
     // Mantener compatibilidad con el sistema anterior si no hay registros diarios aún
@@ -198,35 +209,45 @@ const CuentasPorPagar = () => {
       const registroSemana = p.registroDiario?.[semanaKey] || {};
       
       diasSemana.forEach(dk => {
-        const d = registroSemana[dk];
-        if (d && ((parseFloat(d.monto) || 0) !== 0 || (parseFloat(d.pagado) || 0) !== 0)) {
-          const base = parseFloat(d.monto) || 0;
-          const iva16 = parseFloat(d.iva16) || 0;
-          const iva8 = parseFloat(d.iva8) || 0;
-          const ret = parseFloat(d.retencion) || 0;
-          const pagado = parseFloat(d.pagado) || 0;
-          const totalBruto = base + iva16 + iva8 + ret;
-          const saldo = Math.max(0, totalBruto - pagado);
-
-          const formatearNum = (num) => num.toFixed(2).replace('.', ',');
-
-          filasTransactions.push([
-            `"${p.nombre}"`,
-            `"${p.rif || '-'}"`,
-            `"${p.encargado || '-'}"`,
-            `"${d.fechaOperacion || dk}"`,
-            `"${d.tipoDocumento || 'Factura'}"`,
-            `"${d.numeroFactura || '-'}"`,
-            formatearNum(base),
-            formatearNum(iva16),
-            formatearNum(iva8),
-            formatearNum(ret),
-            formatearNum(totalBruto),
-            formatearNum(pagado),
-            formatearNum(saldo),
-            `"${d.referencia || '-'}"`,
-            `"${(d.observaciones || '').replace(/\n/g, ' ')}"`
-          ]);
+        const diaData = registroSemana[dk];
+        if (diaData) {
+          const registrosDia = Array.isArray(diaData) ? diaData : [diaData];
+          
+          registrosDia.forEach(d => {
+            if (((parseFloat(d.monto) || 0) !== 0 || (parseFloat(d.pagado) || 0) !== 0)) {
+              const base = parseFloat(d.monto) || 0;
+              const sign = base < 0 ? -1 : 1;
+              const absBase = Math.abs(base);
+              const absIva16 = Math.abs(parseFloat(d.iva16) || 0);
+              const absIva8 = Math.abs(parseFloat(d.iva8) || 0);
+              const absRet = Math.abs(parseFloat(d.retencion) || 0);
+              const absRetIva = Math.abs(parseFloat(d.retencionIva) || 0);
+              const pagado = parseFloat(d.pagado) || 0;
+              
+              const totalNeto = ((absBase + absIva16 + absIva8) - absRet - absRetIva) * sign;
+              const saldo = Math.max(0, totalNeto - pagado); // El saldo no puede ser negativo en el CSV
+  
+              const formatearNum = (num) => num.toFixed(2).replace('.', ',');
+  
+              filasTransactions.push([
+                `"${p.nombre}"`,
+                `"${p.rif || '-'}"`,
+                `"${p.encargado || '-'}"`,
+                `"${d.fechaOperacion || dk}"`,
+                `"${d.tipoDocumento || 'Factura'}"`,
+                `"${d.numeroFactura || '-'}"`,
+                formatearNum(base),
+                formatearNum(absIva16 * sign),
+                formatearNum(absIva8 * sign),
+                formatearNum(absRet * sign), // Mostrar las retenciones con su signo respectivo
+                formatearNum(totalNeto),
+                formatearNum(pagado),
+                formatearNum(saldo),
+                `"${d.referencia || '-'}"`,
+                `"${(d.observaciones || '').replace(/\n/g, ' ')}"`
+              ]);
+            }
+          });
         }
       });
     });
@@ -363,33 +384,43 @@ const CuentasPorPagar = () => {
         fechaBase.setDate(fechaBase.getDate() + i);
         const dk = fechaBase.toISOString().split('T')[0];
         
-        const dData = registroSemana[dk];
-        if (dData && ((parseFloat(dData.monto) || 0) !== 0 || (parseFloat(dData.pagado) || 0) !== 0)) {
-          const base = parseFloat(dData.monto) || 0;
-          const iva16 = parseFloat(dData.iva16) || 0;
-          const iva8 = parseFloat(dData.iva8) || 0;
-          const ret = parseFloat(dData.retencion) || 0;
-          const pagado = parseFloat(dData.pagado) || 0;
-          const totalBruto = base + iva16 + iva8 + ret;
-          const saldo = Math.max(0, totalBruto - pagado);
-
-          const formatearNum = (num) => num.toFixed(2).replace('.', ',');
-
-          filasTransactions.push([
-            `"${semana.inicio} a ${semana.fin}"`,
-            `"${dData.fechaOperacion || dk}"`,
-            `"${dData.tipoDocumento || 'Factura'}"`,
-            `"${dData.numeroFactura || '-'}"`,
-            formatearNum(base),
-            formatearNum(iva16),
-            formatearNum(iva8),
-            formatearNum(ret),
-            formatearNum(totalBruto),
-            formatearNum(pagado),
-            formatearNum(saldo),
-            `"${dData.referencia || '-'}"`,
-            `"${(dData.observaciones || '').replace(/\n/g, ' ')}"`
-          ]);
+        const diaData = registroSemana[dk];
+        if (diaData) {
+          const registrosDia = Array.isArray(diaData) ? diaData : [diaData];
+          
+          registrosDia.forEach(dData => {
+            if (((parseFloat(dData.monto) || 0) !== 0 || (parseFloat(dData.pagado) || 0) !== 0)) {
+              const base = parseFloat(dData.monto) || 0;
+              const sign = base < 0 ? -1 : 1;
+              const absBase = Math.abs(base);
+              const absIva16 = Math.abs(parseFloat(dData.iva16) || 0);
+              const absIva8 = Math.abs(parseFloat(dData.iva8) || 0);
+              const absRet = Math.abs(parseFloat(dData.retencion) || 0);
+              const absRetIva = Math.abs(parseFloat(dData.retencionIva) || 0);
+              const pagado = parseFloat(dData.pagado) || 0;
+              
+              const totalNeto = ((absBase + absIva16 + absIva8) - absRet - absRetIva) * sign;
+              const saldo = Math.max(0, totalNeto - pagado);
+  
+              const formatearNum = (num) => num.toFixed(2).replace('.', ',');
+  
+              filasTransactions.push([
+                `"${semana.inicio} a ${semana.fin}"`,
+                `"${dData.fechaOperacion || dk}"`,
+                `"${dData.tipoDocumento || 'Factura'}"`,
+                `"${dData.numeroFactura || '-'}"`,
+                formatearNum(base),
+                formatearNum(absIva16 * sign),
+                formatearNum(absIva8 * sign),
+                formatearNum(absRet * sign),
+                formatearNum(totalNeto),
+                formatearNum(pagado),
+                formatearNum(saldo),
+                `"${dData.referencia || '-'}"`,
+                `"${(dData.observaciones || '').replace(/\n/g, ' ')}"`
+              ]);
+            }
+          });
         }
       });
     });
@@ -630,10 +661,14 @@ const CuentasPorPagar = () => {
       if (proveedor.registroDiario) {
         Object.values(proveedor.registroDiario).forEach(diaRecords => {
           if (diaRecords[diaFiltro]) {
-             const d = diaRecords[diaFiltro];
-             if ((parseFloat(d.monto) || 0) > 0 || (parseFloat(d.pagado) || 0) > 0) {
-               tieneRegistroEseDia = true;
-             }
+             const diaData = diaRecords[diaFiltro];
+             const registrosDia = Array.isArray(diaData) ? diaData : [diaData];
+             
+             registrosDia.forEach(d => {
+               if ((parseFloat(d.monto) || 0) !== 0 || (parseFloat(d.pagado) || 0) !== 0) {
+                 tieneRegistroEseDia = true;
+               }
+             });
           }
         });
       }
