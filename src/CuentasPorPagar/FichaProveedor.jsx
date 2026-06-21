@@ -61,11 +61,35 @@ const FichaProveedor = ({
     const registroDia = { ...nuevoRegistro[semanaKey][diaKey] };
     registroDia[campo] = valor;
 
-    // Auto-cálculo de IVA
+    // Auto-cálculo de IVA según tasa seleccionada
     if (campo === 'monto') {
       const montoNum = parseFloat(valor) || 0;
-      registroDia.iva16 = (montoNum * 0.16).toFixed(2);
-      registroDia.iva8 = (montoNum * 0.08).toFixed(2);
+      const tasa = registroDia.tasaIva || '16';
+      if (tasa === '16') {
+        registroDia.iva16 = (montoNum * 0.16).toFixed(2);
+        registroDia.iva8 = '0';
+      } else if (tasa === '8') {
+        registroDia.iva16 = '0';
+        registroDia.iva8 = (montoNum * 0.08).toFixed(2);
+      } else {
+        registroDia.iva16 = '0';
+        registroDia.iva8 = '0';
+      }
+    }
+
+    // Recalcular IVA al cambiar la tasa
+    if (campo === 'tasaIva') {
+      const montoNum = parseFloat(registroDia.monto) || 0;
+      if (valor === '16') {
+        registroDia.iva16 = (montoNum * 0.16).toFixed(2);
+        registroDia.iva8 = '0';
+      } else if (valor === '8') {
+        registroDia.iva16 = '0';
+        registroDia.iva8 = (montoNum * 0.08).toFixed(2);
+      } else {
+        registroDia.iva16 = '0';
+        registroDia.iva8 = '0';
+      }
     }
 
     nuevoRegistro[semanaKey][diaKey] = registroDia;
@@ -216,13 +240,26 @@ const FichaProveedor = ({
                                       </div>
 
                                       <div className="form-grid-2">
-                                        <div className="f-field calc">
-                                          <label>IVA 16% (Auto)</label>
-                                          <input type="text" value={dData.iva16 || '0.00'} readOnly />
+                                        <div className="f-field">
+                                          <label>Tasa de IVA</label>
+                                          <select 
+                                            value={dData.tasaIva || '16'} 
+                                            onChange={(e) => manejarCambioDiario(semana.key, dia.key, 'tasaIva', e.target.value)}
+                                          >
+                                            <option value="16">IVA 16%</option>
+                                            <option value="8">IVA 8%</option>
+                                            <option value="0">Exento (0%)</option>
+                                          </select>
                                         </div>
                                         <div className="f-field calc">
-                                          <label>IVA 8% (Auto)</label>
-                                          <input type="text" value={dData.iva8 || '0.00'} readOnly />
+                                          <label>Monto IVA (Auto)</label>
+                                          <input type="text" value={
+                                            (dData.tasaIva || '16') === '16' 
+                                              ? `$${dData.iva16 || '0.00'}` 
+                                              : (dData.tasaIva === '8' 
+                                                ? `$${dData.iva8 || '0.00'}` 
+                                                : '$0.00')
+                                          } readOnly />
                                         </div>
                                       </div>
 
