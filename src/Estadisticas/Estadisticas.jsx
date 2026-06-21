@@ -20,16 +20,66 @@ const Estadisticas = () => {
     const cargarProveedores = async () => {
       setCargando(true);
       try {
-        const q = limite === 'todos' 
-          ? query(collection(db, 'proveedores'), orderBy('saldo', 'desc'))
-          : query(collection(db, 'proveedores'), orderBy('saldo', 'desc'), limitFirestore(limite));
-        
-        const querySnapshot = await getDocs(q);
-        const data = [];
+        const querySnapshot = await getDocs(collection(db, 'por_pagar'));
+        let data = [];
         
         querySnapshot.forEach((doc) => {
-          data.push({ id: doc.id, ...doc.data() });
+          const p = doc.data();
+          let deudaAnual = 0;
+          let pagadoAnual = 0;
+
+          if (p.registroDiario) {
+            Object.values(p.registroDiario).forEach(semanaObj => {
+              Object.values(semanaObj).forEach(diaData => {
+                const registrosDia = Array.isArray(diaData) ? diaData : [diaData];
+                registrosDia.forEach(reg => {
+                  if (((parseFloat(reg.monto) || 0) !== 0 || (parseFloat(reg.pagado) || 0) !== 0)) {
+                    const base = parseFloat(reg.monto) || 0;
+                    const sign = base < 0 ? -1 : 1;
+                    const absBase = Math.abs(base);
+                    const absIva16 = Math.abs(parseFloat(reg.iva16) || 0);
+                    const absIva8 = Math.abs(parseFloat(reg.iva8) || 0);
+                    const absRet = Math.abs(parseFloat(reg.retencion) || 0);
+                    const absRetIva = Math.abs(parseFloat(reg.retencionIva) || 0);
+                    const pagado = parseFloat(reg.pagado) || 0;
+                    
+                    const totalNeto = ((absBase + absIva16 + absIva8) - absRet - absRetIva) * sign;
+                    const tipoDoc = reg.tipoDocumento || 'Factura';
+                    
+                    if (tipoDoc === 'Pago' || tipoDoc === 'Nota de Crédito') {
+                      pagadoAnual += Math.abs(totalNeto);
+                    } else {
+                      deudaAnual += totalNeto;
+                    }
+                  }
+                });
+              });
+            });
+          }
+
+          if (p.deudas) {
+            p.deudas.forEach(d => {
+              deudaAnual += parseFloat(d.monto || 0);
+              pagadoAnual += parseFloat(d.pagado || 0);
+            });
+          }
+
+          const pendiente = Math.max(0, deudaAnual - pagadoAnual);
+
+          data.push({ 
+            id: doc.id, 
+            nombre: p.nombre,
+            saldo: deudaAnual,
+            pagos: pagadoAnual,
+            pendiente: pendiente
+          });
         });
+        
+        data.sort((a, b) => b.saldo - a.saldo);
+
+        if (limite !== 'todos') {
+          data = data.slice(0, limite);
+        }
         
         setProveedoresData(data);
       } catch (error) {

@@ -606,7 +606,8 @@ const CuentasPorPagar = () => {
     const semana = {
       inicio: inicioFormateado,
       fin: finFormateado,
-      key: nuevaSemanaKey
+      key: nuevaSemanaKey,
+      creadaManualmente: true
     };
     
     setSemanas([...semanas, semana]);
@@ -719,7 +720,7 @@ const CuentasPorPagar = () => {
         const totales = obtenerTotalesSemana(p, semana.key);
         return totales.monto !== 0 || totales.pagado !== 0;
       });
-      if (!tieneActividad) return false;
+      if (!tieneActividad && !semana.creadaManualmente) return false;
     }
 
     return true;
