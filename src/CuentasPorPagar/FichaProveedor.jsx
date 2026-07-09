@@ -13,6 +13,7 @@ const TASA_IVA_CONFIG = {
   '16': { label: 'IVA 16%', color: '#f59e0b', icon: '🔶' },
   '8':  { label: 'IVA 8%',  color: '#8b5cf6', icon: '🔷' },
   '0':  { label: 'Exento',  color: '#6b7280', icon: '⚪' },
+  'Manual': { label: 'Manual', color: '#ec4899', icon: '📝' }
 };
 
 const FichaProveedor = ({ 
@@ -20,7 +21,8 @@ const FichaProveedor = ({
   semanas, 
   semanaAbiertaInicial, 
   onClose, 
-  onSave 
+  onSave,
+  puedeEditar = true
 }) => {
   const [datosDetalle, setDatosDetalle] = useState({
     rif: proveedor.rif || '',
@@ -60,6 +62,9 @@ const FichaProveedor = ({
     } else if (tasa === '8') {
       registroDia.iva16 = '0';
       registroDia.iva8 = (montoNum * 0.08).toFixed(2);
+    } else if (tasa === 'Manual') {
+      registroDia.iva16 = '0';
+      registroDia.iva8 = '0';
     } else {
       registroDia.iva16 = '0';
       registroDia.iva8 = '0';
@@ -71,7 +76,7 @@ const FichaProveedor = ({
       registroDia.retencion = (Math.abs(montoNum) * 0.0125).toFixed(2);
     }
 
-    const montoIva = parseFloat(tasa === '16' ? registroDia.iva16 : (tasa === '8' ? registroDia.iva8 : '0')) || 0;
+    const montoIva = parseFloat(tasa === '16' ? registroDia.iva16 : (tasa === '8' ? registroDia.iva8 : (tasa === 'Manual' ? registroDia.ivaManual : '0'))) || 0;
     const pctRetencionIva = registroDia.porcentajeRetencionIva || '75';
     if (tasa === '0' || registroDia.aplicaRetencionIva === false) {
       registroDia.retencionIva = '0';
@@ -92,7 +97,9 @@ const FichaProveedor = ({
 
   const calcularTotalRegistro = (dData) => {
     const monto = parseFloat(dData.monto) || 0;
-    const iva = (parseFloat(dData.iva16) || 0) + (parseFloat(dData.iva8) || 0);
+    const iva = dData.tasaIva === 'Manual'
+                ? (parseFloat(dData.ivaManual) || 0)
+                : (parseFloat(dData.iva16) || 0) + (parseFloat(dData.iva8) || 0);
     const retMunicipal = parseFloat(dData.retencion) || 0;
     const retIva = parseFloat(dData.retencionIva) || 0;
     return (Math.abs(monto) + Math.abs(iva)) - retMunicipal - retIva;
@@ -117,6 +124,7 @@ const FichaProveedor = ({
       fechaOperacion: fechaActiva,
       monto: '',
       pagado: '',
+      ivaManual: '',
       tasaIva: tipoDoc === 'Pago' ? '0' : '16', // Por defecto los pagos son exentos
       porcentajeRetencionIva: '75',
       aplicaRetencionMunicipal: esResta ? false : true,
@@ -213,7 +221,10 @@ const FichaProveedor = ({
   const totalesGenerales = getTodosLosDocumentos().reduce((acc, doc) => {
     const base = parseFloat(doc.monto) || 0;
     const sign = base < 0 ? -1 : 1;
-    const neto = ((Math.abs(base) + Math.abs(parseFloat(doc.iva16) || 0) + Math.abs(parseFloat(doc.iva8) || 0)) 
+    const iva = doc.tasaIva === 'Manual'
+                ? (parseFloat(doc.ivaManual) || 0)
+                : (parseFloat(doc.iva16) || 0) + (parseFloat(doc.iva8) || 0);
+    const neto = ((Math.abs(base) + Math.abs(iva)) 
                  - Math.abs(parseFloat(doc.retencion) || 0) - Math.abs(parseFloat(doc.retencionIva) || 0)) * sign;
     acc.deuda += neto;
     acc.pagado += parseFloat(doc.pagado) || 0;
@@ -250,11 +261,11 @@ const FichaProveedor = ({
               <h3>Datos Fiscales</h3>
               <div className="input-field-full">
                 <label>RIF / Identificación</label>
-                <input type="text" value={datosDetalle.rif} onChange={(e) => setDatosDetalle({...datosDetalle, rif: e.target.value})} placeholder="J-00000000-0" />
+                <input type="text" value={datosDetalle.rif} onChange={(e) => setDatosDetalle({...datosDetalle, rif: e.target.value})} placeholder="J-00000000-0" disabled={!puedeEditar} />
               </div>
               <div className="input-field-full">
                 <label>Persona Encargada</label>
-                <input type="text" value={datosDetalle.encargado} onChange={(e) => setDatosDetalle({...datosDetalle, encargado: e.target.value})} placeholder="Nombre de contacto" />
+                <input type="text" value={datosDetalle.encargado} onChange={(e) => setDatosDetalle({...datosDetalle, encargado: e.target.value})} placeholder="Nombre de contacto" disabled={!puedeEditar} />
               </div>
             </section>
 
@@ -301,17 +312,19 @@ const FichaProveedor = ({
                 </div>
 
                 {/* Menú de Operaciones Maestras */}
-                <div className="operations-menu-card">
-                  <h3>Registrar Operación en el Día</h3>
-                  <div className="operations-buttons">
-                    {Object.entries(TIPO_DOC_CONFIG).map(([key, cfg]) => (
-                      <button key={key} className="op-btn" style={{ '--op-color': cfg.color }} onClick={() => crearDocumento(key)}>
-                        <span className="op-icon">{cfg.icon}</span>
-                        <span className="op-label">{cfg.label}</span>
-                      </button>
-                    ))}
+                {puedeEditar && (
+                  <div className="operations-menu-card">
+                    <h3>Registrar Operación en el Día</h3>
+                    <div className="operations-buttons">
+                      {Object.entries(TIPO_DOC_CONFIG).map(([key, cfg]) => (
+                        <button key={key} className="op-btn" style={{ '--op-color': cfg.color }} onClick={() => crearDocumento(key)}>
+                          <span className="op-icon">{cfg.icon}</span>
+                          <span className="op-label">{cfg.label}</span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 {/* Resumen del Día Actual */}
                 <div className="day-summary-card">
@@ -351,14 +364,16 @@ const FichaProveedor = ({
                               <h4>{tipoDoc}</h4>
                               <span className={`doc-effect ${esResta ? 'resta' : 'suma'}`}>{esResta ? 'Resta Deuda' : 'Suma Deuda'}</span>
                             </div>
-                            <button className="btn-delete-doc" onClick={() => eliminarDocumento(docId)}>🗑️ Eliminar</button>
+                            {puedeEditar && (
+                              <button className="btn-delete-doc" onClick={() => eliminarDocumento(docId)}>🗑️ Eliminar</button>
+                            )}
                           </div>
 
                           <div className="document-card-body">
-                            <div className="form-grid-3">
+                            <div className={`form-grid-${tipoDoc === 'Pago' ? '2' : '3'}`}>
                               <div className="f-field">
-                                <label>Número de Control</label>
-                                <input type="text" value={dData.numeroFactura || ''} onChange={(e) => manejarCambioDoc(docId, 'numeroFactura', e.target.value)} placeholder="0001" />
+                                <label>{tipoDoc === 'Pago' ? 'Número de Referencia' : 'Número de Control'}</label>
+                                <input type="text" value={dData.numeroFactura || ''} onChange={(e) => manejarCambioDoc(docId, 'numeroFactura', e.target.value)} placeholder={tipoDoc === 'Pago' ? 'Efectivo, Transferencia...' : '0001'} disabled={!puedeEditar} />
                               </div>
                               <div className="f-field">
                                 <label>Monto Base {esResta && '(Se aplicará negativo)'}</label>
@@ -370,90 +385,110 @@ const FichaProveedor = ({
                                     onChange={(e) => manejarCambioDoc(docId, 'monto', e.target.value)} 
                                     placeholder="0.00" 
                                     className={esResta ? 'input-resta' : ''}
+                                    disabled={!puedeEditar}
                                   />
                                 </div>
                               </div>
-                              <div className="f-field">
-                                <label>Pagado</label>
-                                <input type="number" value={dData.pagado || ''} onChange={(e) => manejarCambioDoc(docId, 'pagado', e.target.value)} placeholder="0.00" />
-                              </div>
+                              {tipoDoc !== 'Pago' && (
+                                <div className="f-field">
+                                  <label>Pagado</label>
+                                  <input type="number" value={dData.pagado || ''} onChange={(e) => manejarCambioDoc(docId, 'pagado', e.target.value)} placeholder="0.00" disabled={!puedeEditar} />
+                                </div>
+                              )}
                             </div>
 
-                            <div className="form-grid-3">
-                              {/* ─── Selector de IVA ─── */}
-                              <div className="f-field iva-field">
-                                <label>Tasa de IVA</label>
-                                <div className="iva-selector">
-                                  {Object.entries(TASA_IVA_CONFIG).map(([key, cfg]) => (
-                                    <button
-                                      key={key}
-                                      type="button"
-                                      className={`iva-option ${tasaActual === key ? 'selected' : ''}`}
-                                      style={{ '--iva-color': cfg.color }}
-                                      onClick={() => manejarCambioDoc(docId, 'tasaIva', key)}
-                                    >
-                                      <span className="iva-icon">{cfg.icon}</span>
-                                      <span className="iva-label">{cfg.label}</span>
-                                    </button>
-                                  ))}
+                            {tipoDoc !== 'Pago' && (
+                              <div className="form-grid-3">
+                                {/* ─── Selector de IVA ─── */}
+                                <div className="f-field iva-field">
+                                  <label>Tasa de IVA</label>
+                                  <div className="iva-selector">
+                                    {Object.entries(TASA_IVA_CONFIG).map(([key, cfg]) => (
+                                      <button
+                                        key={key}
+                                        type="button"
+                                        disabled={!puedeEditar}
+                                        className={`iva-option ${tasaActual === key ? 'selected' : ''}`}
+                                        style={{ '--iva-color': cfg.color }}
+                                        onClick={() => manejarCambioDoc(docId, 'tasaIva', key)}
+                                      >
+                                        <span className="iva-icon">{cfg.icon}</span>
+                                        <span className="iva-label">{cfg.label}</span>
+                                      </button>
+                                    ))}
+                                  </div>
                                 </div>
-                              </div>
-                              {/* ─── Ret. Municipal auto-calculada (1.25%) ─── */}
-                              <div className="f-field calc">
-                                <label>
-                                  Ret. Municipal (1,25%)
-                                  {esResta && (
+                                {/* ─── Ret. Municipal auto-calculada (1.25%) ─── */}
+                                <div className="f-field calc">
+                                  <label>
+                                    Ret. Municipal (1,25%)
                                     <label className="toggle-switch-small">
                                       <input 
                                         type="checkbox" 
                                         checked={dData.aplicaRetencionMunicipal !== false} 
                                         onChange={(e) => manejarCambioDoc(docId, 'aplicaRetencionMunicipal', e.target.checked)}
+                                        disabled={!puedeEditar}
                                       />
                                       <span className="slider-small round"></span>
                                     </label>
-                                  )}
-                                </label>
-                                <div className={`auto-calc-display ret-municipal ${dData.aplicaRetencionMunicipal === false ? 'disabled' : ''}`}>
-                                  <span className="auto-calc-icon">🏛️</span>
-                                  <span className="auto-calc-value">${parseFloat(dData.retencion || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                  <span className="auto-calc-label">{dData.aplicaRetencionMunicipal === false ? 'Desactivado' : 'Auto'}</span>
+                                  </label>
+                                  <div className={`auto-calc-display ret-municipal ${dData.aplicaRetencionMunicipal === false ? 'disabled' : ''}`}>
+                                    <span className="auto-calc-icon">🏛️</span>
+                                    <span className="auto-calc-value">${parseFloat(dData.retencion || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                    <span className="auto-calc-label">{dData.aplicaRetencionMunicipal === false ? 'Desactivado' : 'Auto'}</span>
+                                  </div>
                                 </div>
                               </div>
-                            </div>
+                            )}
 
-                            <div className={`form-grid-${tasaActual !== '0' ? '2' : '2'}`}>
-                              <div className="f-field calc">
-                                <label>Monto IVA (Auto-calculado)</label>
-                                <div className="iva-result" style={{ '--iva-result-color': tasaCfg.color }}>
-                                  <span className="iva-result-icon">{tasaCfg.icon}</span>
-                                  <span className="iva-result-value">
-                                    {tasaActual === '16' ? `$${dData.iva16 || '0.00'}` : (tasaActual === '8' ? `$${dData.iva8 || '0.00'}` : '$0.00')}
-                                  </span>
-                                  <span className="iva-result-label">{tasaCfg.label}</span>
-                                </div>
-                              </div>
+                            {tipoDoc !== 'Pago' && (
+                              <div className={`form-grid-${tasaActual !== '0' ? '2' : '2'}`}>
+                                {tasaActual === 'Manual' ? (
+                                  <div className="f-field">
+                                    <label>Monto IVA Manual</label>
+                                    <div className="input-with-sign">
+                                      <input
+                                        type="number"
+                                        value={dData.ivaManual || ''}
+                                        onChange={(e) => manejarCambioDoc(docId, 'ivaManual', e.target.value)}
+                                        placeholder="0.00"
+                                        disabled={!puedeEditar}
+                                      />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="f-field calc">
+                                    <label>Monto IVA (Auto-calculado)</label>
+                                    <div className="iva-result" style={{ '--iva-result-color': tasaCfg.color }}>
+                                      <span className="iva-result-icon">{tasaCfg.icon}</span>
+                                      <span className="iva-result-value">
+                                        {tasaActual === '16' ? `$${dData.iva16 || '0.00'}` : (tasaActual === '8' ? `$${dData.iva8 || '0.00'}` : '$0.00')}
+                                      </span>
+                                      <span className="iva-result-label">{tasaCfg.label}</span>
+                                    </div>
+                                  </div>
+                                )}
 
                               {/* ─── Retención de IVA ─── */}
                               {tasaActual !== '0' && (
                                 <div className="f-field calc retencion-iva-field">
                                   <label>
                                     Retención de IVA
-                                    {esResta && (
-                                      <label className="toggle-switch-small">
-                                        <input 
-                                          type="checkbox" 
-                                          checked={dData.aplicaRetencionIva !== false} 
-                                          onChange={(e) => manejarCambioDoc(docId, 'aplicaRetencionIva', e.target.checked)}
-                                        />
-                                        <span className="slider-small round"></span>
-                                      </label>
-                                    )}
+                                    <label className="toggle-switch-small">
+                                      <input 
+                                        type="checkbox" 
+                                        checked={dData.aplicaRetencionIva !== false} 
+                                        onChange={(e) => manejarCambioDoc(docId, 'aplicaRetencionIva', e.target.checked)}
+                                        disabled={!puedeEditar}
+                                      />
+                                      <span className="slider-small round"></span>
+                                    </label>
                                   </label>
                                   <div className={`retencion-iva-container ${dData.aplicaRetencionIva === false ? 'disabled' : ''}`}>
                                     <div className="retencion-pct-selector">
                                       <button
                                         type="button"
-                                        disabled={dData.aplicaRetencionIva === false}
+                                        disabled={!puedeEditar || dData.aplicaRetencionIva === false}
                                         className={`pct-option ${(dData.porcentajeRetencionIva || '75') === '75' ? 'selected' : ''}`}
                                         onClick={() => manejarCambioDoc(docId, 'porcentajeRetencionIva', '75')}
                                       >
@@ -461,7 +496,7 @@ const FichaProveedor = ({
                                       </button>
                                       <button
                                         type="button"
-                                        disabled={dData.aplicaRetencionIva === false}
+                                        disabled={!puedeEditar || dData.aplicaRetencionIva === false}
                                         className={`pct-option ${(dData.porcentajeRetencionIva || '75') === '100' ? 'selected' : ''}`}
                                         onClick={() => manejarCambioDoc(docId, 'porcentajeRetencionIva', '100')}
                                       >
@@ -477,6 +512,7 @@ const FichaProveedor = ({
                                 </div>
                               )}
                             </div>
+                            )}
 
                             {/* ─── Total del Registro (Neto) ─── */}
                             <div className="f-field total-dia-field">
@@ -488,27 +524,33 @@ const FichaProveedor = ({
                                 </span>
                                 <div className="total-breakdown">
                                   <span className="breakdown-item">Base: ${Math.abs(parseFloat(dData.monto) || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                  <span className="breakdown-item">+ IVA: ${(Math.abs(parseFloat(dData.iva16) || 0) + Math.abs(parseFloat(dData.iva8) || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                  <span className="breakdown-item subtract">− Ret.M: ${parseFloat(dData.retencion || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                  <span className="breakdown-item subtract">− Ret.IVA: ${parseFloat(dData.retencionIva || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                  {tipoDoc !== 'Pago' && (
+                                    <>
+                                      <span className="breakdown-item">+ IVA: ${(dData.tasaIva === 'Manual' ? (parseFloat(dData.ivaManual) || 0) : (Math.abs(parseFloat(dData.iva16) || 0) + Math.abs(parseFloat(dData.iva8) || 0))).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                      <span className="breakdown-item subtract">− Ret.M: ${parseFloat(dData.retencion || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                      <span className="breakdown-item subtract">− Ret.IVA: ${parseFloat(dData.retencionIva || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             </div>
 
-                            <div className="form-grid-2">
-                              <div className="f-field">
-                                <label>Referencia / Método de Pago</label>
-                                <input type="text" value={dData.referencia || ''} onChange={(e) => manejarCambioDoc(docId, 'referencia', e.target.value)} placeholder="Efectivo, Transferencia #0000, Pago Móvil..." />
-                              </div>
+                            <div className={`form-grid-${tipoDoc === 'Pago' ? '1' : '2'}`}>
+                              {tipoDoc !== 'Pago' && (
+                                <div className="f-field">
+                                  <label>Referencia / Método de Pago</label>
+                                  <input type="text" value={dData.referencia || ''} onChange={(e) => manejarCambioDoc(docId, 'referencia', e.target.value)} placeholder="Efectivo, Transferencia #0000, Pago Móvil..." disabled={!puedeEditar} />
+                                </div>
+                              )}
                               <div className="f-field">
                                 <label>URL Soporte (Opcional)</label>
-                                <input type="text" value={dData.facturaUrl || ''} onChange={(e) => manejarCambioDoc(docId, 'facturaUrl', e.target.value)} placeholder="https://..." />
+                                <input type="text" value={dData.facturaUrl || ''} onChange={(e) => manejarCambioDoc(docId, 'facturaUrl', e.target.value)} placeholder="https://..." disabled={!puedeEditar} />
                               </div>
                             </div>
 
                             <div className="f-field">
                               <label>Observaciones</label>
-                              <textarea value={dData.observaciones || ''} onChange={(e) => manejarCambioDoc(docId, 'observaciones', e.target.value)} placeholder="Detalles adicionales sobre esta transacción..." className="observaciones-textarea" />
+                              <textarea value={dData.observaciones || ''} onChange={(e) => manejarCambioDoc(docId, 'observaciones', e.target.value)} placeholder="Detalles adicionales sobre esta transacción..." className="observaciones-textarea" disabled={!puedeEditar} />
                             </div>
                           </div>
                         </div>
@@ -579,8 +621,10 @@ const FichaProveedor = ({
         <footer className="ficha-footer">
           <p className="footer-status">Los cambios se sincronizarán con la base de datos de Firebase.</p>
           <div className="f-actions">
-            <button className="btn-secondary-full" onClick={onClose}>Descartar</button>
-            <button className="btn-primary-full" onClick={() => onSave(datosDetalle)}>Guardar Cambios</button>
+            <button className="btn-secondary-full" onClick={onClose}>Cerrar</button>
+            {puedeEditar && (
+              <button className="btn-primary-full" onClick={() => onSave(datosDetalle)}>Guardar Cambios</button>
+            )}
           </div>
         </footer>
       </div>

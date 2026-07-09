@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, setDoc, getDoc } from 'firebase/firestore';
-import { db } from '../../credentials';
+import { db, auth } from '../../credentials';
 import { InstallAppButton } from '../PWA/InstallAppButton';
 import FichaProveedor from './FichaProveedor';
 import './CuentasPorPagar.css';
@@ -37,6 +37,10 @@ const CuentasPorPagar = () => {
   const [mostrarModalDetalle, setMostrarModalDetalle] = useState(false);
   const [semanaAbierta, setSemanaAbierta] = useState(null);
   const [mostrarDropdownSemanas, setMostrarDropdownSemanas] = useState(false);
+
+  const userEmail = auth?.currentUser?.email;
+  const puedeEliminar = userEmail === 'marco.betancourt@correo.unimet.edu.ve';
+  const puedeEditar = puedeEliminar || userEmail === 'reinaldo.pinchopan@gmail.com' || userEmail === 'marcobetancourt2006@gmail.com';
 
   // Generar todas las semanas del año actual (Lunes a Domingo)
   const generarSemanasAnioActual = () => {
@@ -413,12 +417,12 @@ const CuentasPorPagar = () => {
     const subTitular = `Estado de Cuenta Histórico: ${p.nombre} (RIF: ${p.rif || '-'})`;
 
     const headers = [
-      'Semana', 'Fecha', 'Tipo de Documento', 'Nro Factura',
-      'Monto Base', 'IVA 16%', 'IVA 8%', 'Ret. Municipal', 'Total Bruto',
-      'Pagado', 'Saldo', 'Referencia/Pago', 'Observaciones'
+      'Fecha', 'Tipo de Documento', 'Nro Referencia',
+      'Monto Base', 'IVA 16%', 'IVA 8%', 'Ret. Municipal', 'Ret. IVA', '% Ret. IVA', 'Total Bruto',
+      'Pagado', 'Saldo Acumulado', 'Referencia/Pago', 'Observaciones'
     ];
 
-    const filasTransactions = [];
+    let todasLasTransacciones = [];
 
     semanas.forEach(semana => {
       const registroSemana = p.registroDiario?.[semana.key] || {};
@@ -435,39 +439,63 @@ const CuentasPorPagar = () => {
           
           registrosDia.forEach(dData => {
             if (((parseFloat(dData.monto) || 0) !== 0 || (parseFloat(dData.pagado) || 0) !== 0)) {
-              const base = parseFloat(dData.monto) || 0;
-              const sign = base < 0 ? -1 : 1;
-              const absBase = Math.abs(base);
-              const absIva16 = Math.abs(parseFloat(dData.iva16) || 0);
-              const absIva8 = Math.abs(parseFloat(dData.iva8) || 0);
-              const absRet = Math.abs(parseFloat(dData.retencion) || 0);
-              const absRetIva = Math.abs(parseFloat(dData.retencionIva) || 0);
-              const pagado = parseFloat(dData.pagado) || 0;
-              
-              const totalNeto = ((absBase + absIva16 + absIva8) - absRet - absRetIva) * sign;
-              const saldo = Math.max(0, totalNeto - pagado);
-  
-              const formatearNum = (num) => num.toFixed(2).replace('.', ',');
-  
-              filasTransactions.push([
-                `"${semana.inicio} a ${semana.fin}"`,
-                `"${dData.fechaOperacion || dk}"`,
-                `"${dData.tipoDocumento || 'Factura'}"`,
-                `"${dData.numeroFactura || '-'}"`,
-                formatearNum(base),
-                formatearNum(absIva16 * sign),
-                formatearNum(absIva8 * sign),
-                formatearNum(absRet * sign),
-                formatearNum(totalNeto),
-                formatearNum(pagado),
-                formatearNum(saldo),
-                `"${dData.referencia || '-'}"`,
-                `"${(dData.observaciones || '').replace(/\n/g, ' ')}"`
-              ]);
+              todasLasTransacciones.push({ ...dData, dk });
             }
           });
         }
       });
+    });
+
+    // Ordenar cronológicamente (más antiguo primero)
+    todasLasTransacciones.sort((a, b) => {
+      const fechaA = new Date((a.fechaOperacion || a.dk) + 'T00:00:00');
+      const fechaB = new Date((b.fechaOperacion || b.dk) + 'T00:00:00');
+      return fechaA - fechaB;
+    });
+
+    const filasTransactions = [];
+    let saldoAcumulado = 0;
+
+    todasLasTransacciones.forEach(dData => {
+      const base = parseFloat(dData.monto) || 0;
+      const sign = base < 0 ? -1 : 1;
+      const absBase = Math.abs(base);
+      
+      let absIva16 = 0, absIva8 = 0;
+      if (dData.tasaIva === 'Manual') {
+         absIva16 = Math.abs(parseFloat(dData.ivaManual) || 0);
+      } else {
+         absIva16 = Math.abs(parseFloat(dData.iva16) || 0);
+         absIva8 = Math.abs(parseFloat(dData.iva8) || 0);
+      }
+      
+      const absRet = Math.abs(parseFloat(dData.retencion) || 0);
+      const absRetIva = Math.abs(parseFloat(dData.retencionIva) || 0);
+      const pagado = parseFloat(dData.pagado) || 0;
+      
+      const totalNeto = ((absBase + absIva16 + absIva8) - absRet - absRetIva) * sign;
+      
+      saldoAcumulado = saldoAcumulado + totalNeto - pagado;
+      const saldoMostrar = Math.max(0, saldoAcumulado);
+
+      const formatearNum = (num) => num.toFixed(2).replace('.', ',');
+
+      filasTransactions.push([
+        `"${dData.fechaOperacion || dData.dk}"`,
+        `"${dData.tipoDocumento || 'Factura'}"`,
+        `"${dData.numeroFactura || '-'}"`,
+        formatearNum(base),
+        formatearNum(absIva16 * sign),
+        formatearNum(absIva8 * sign),
+        formatearNum(absRet * sign),
+        formatearNum(absRetIva * sign),
+        `"${dData.aplicaRetencionIva === false ? 'No' : (dData.porcentajeRetencionIva || '75') + '%'}"`,
+        formatearNum(totalNeto),
+        formatearNum(pagado),
+        formatearNum(saldoMostrar),
+        `"${dData.referencia || '-'}"`,
+        `"${(dData.observaciones || '').replace(/\n/g, ' ')}"`
+      ]);
     });
 
     const csvContent = [
@@ -880,6 +908,7 @@ const CuentasPorPagar = () => {
         semanaAbiertaInicial={semanaAbierta}
         onClose={() => setMostrarModalDetalle(false)}
         onSave={guardarDetalleProveedor}
+        puedeEditar={puedeEditar}
       />
     );
   }
@@ -958,21 +987,25 @@ const CuentasPorPagar = () => {
         </div>
         
         <div className="acciones">
-          <div className="nuevo-proveedor">
-            <input
-              type="text"
-              placeholder="Nombre del proveedor"
-              value={nuevoProveedor.nombre}
-              onChange={(e) => setNuevoProveedor({...nuevoProveedor, nombre: e.target.value})}
-            />
-            <button className="btn btn-primary" onClick={agregarProveedor}>
-              Agregar Proveedor
-            </button>
-          </div>
-          
-          <button className="btn btn-secondary" onClick={() => setMostrarModal(true)}>
-            Agregar Semana
-          </button>
+          {puedeEditar && (
+            <>
+              <div className="nuevo-proveedor">
+                <input
+                  type="text"
+                  placeholder="Nombre del proveedor"
+                  value={nuevoProveedor.nombre}
+                  onChange={(e) => setNuevoProveedor({...nuevoProveedor, nombre: e.target.value})}
+                />
+                <button className="btn btn-primary" onClick={agregarProveedor}>
+                  Agregar Proveedor
+                </button>
+              </div>
+              
+              <button className="btn btn-secondary" onClick={() => setMostrarModal(true)}>
+                Agregar Semana
+              </button>
+            </>
+          )}
           <button className="btn-reporte-anual" onClick={descargarReporteAnualCSV}>
             📥 Reporte Anual
           </button>
@@ -1110,13 +1143,15 @@ const CuentasPorPagar = () => {
                     >
                       📊 Resumen
                     </button>
-                    <button 
-                      className="btn-eliminar-semana"
-                      onClick={() => eliminarSemana(semana.key)}
-                      title="Eliminar semana"
-                    >
-                      ✕
-                    </button>
+                    {puedeEliminar && (
+                      <button 
+                        className="btn-eliminar-semana"
+                        onClick={() => eliminarSemana(semana.key)}
+                        title="Eliminar semana"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
                 </th>
               ))}
@@ -1159,15 +1194,17 @@ const CuentasPorPagar = () => {
                             </div>
                           </div>
                           
-                          <label className="checkbox-pagado">
-                            <input
-                              type="checkbox"
-                              checked={deudaMeta.pagadoCompleto}
-                              onChange={(e) => actualizarPagoCompleto(proveedor.id, semana.key, e.target.checked)}
-                            />
-                            <span className="checkmark"></span>
-                            Marcar pagado
-                          </label>
+                          {puedeEditar && (
+                            <label className="checkbox-pagado">
+                              <input
+                                type="checkbox"
+                                checked={deudaMeta.pagadoCompleto}
+                                onChange={(e) => actualizarPagoCompleto(proveedor.id, semana.key, e.target.checked)}
+                              />
+                              <span className="checkmark"></span>
+                              Marcar pagado
+                            </label>
+                          )}
                         </div>
                       </td>
                     );
@@ -1195,12 +1232,14 @@ const CuentasPorPagar = () => {
                       >
                         📥 Reporte
                       </button>
-                      <button 
-                        className="btn btn-eliminar"
-                        onClick={() => eliminarProveedor(proveedor.id)}
-                      >
-                        Eliminar
-                      </button>
+                      {puedeEliminar && (
+                        <button 
+                          className="btn btn-eliminar"
+                          onClick={() => eliminarProveedor(proveedor.id)}
+                        >
+                          Eliminar
+                        </button>
+                      )}
                     </td>
                   </tr>
               ))
