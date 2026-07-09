@@ -659,6 +659,143 @@
   justify-content: flex-end;
 }
 
+/* Dropdown de semanas del año */
+.semanas-anio-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+  position: relative;
+}
+
+.btn-dropdown-toggle {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  color: white;
+  padding: 12px 16px;
+  border-radius: 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 500;
+  width: 100%;
+}
+
+.btn-dropdown-toggle:hover {
+  background: linear-gradient(135deg, #334155 0%, #475569 100%);
+  border-color: rgba(148, 163, 184, 0.5);
+  box-shadow: none;
+  transform: none;
+}
+
+.dropdown-arrow {
+  transition: transform 0.3s;
+  font-size: 0.8rem;
+}
+
+.dropdown-arrow.open {
+  transform: rotate(180deg);
+}
+
+.dropdown-semanas-list {
+  background: rgba(15, 23, 42, 0.95);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  border-radius: 12px;
+  max-height: 250px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  /* Estilos para que se pueda hacer scroll ('arrastrar' en móvil/pc) */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(59, 130, 246, 0.5) rgba(0, 0, 0, 0.2);
+}
+
+.dropdown-semanas-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dropdown-semanas-list::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+}
+
+.dropdown-semanas-list::-webkit-scrollbar-thumb {
+  background: rgba(59, 130, 246, 0.5);
+  border-radius: 10px;
+}
+
+.dropdown-semana-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: transparent;
+  border: none;
+  color: white;
+  text-align: left;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.dropdown-semana-item:hover:not(:disabled) {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.dropdown-semana-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.semana-num {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60a5fa;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: center;
+}
+
+.semana-rango {
+  flex: 1;
+  font-size: 0.9rem;
+}
+
+.ya-existe-badge {
+  font-size: 0.7rem;
+  background: rgba(239, 68, 68, 0.2);
+  color: #f87171;
+  padding: 2px 6px;
+  border-radius: 4px;
+  text-transform: uppercase;
+  font-weight: bold;
+}
+
+.separador-modal {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 15px 0;
+  font-size: 0.85rem;
+}
+
+.separador-modal::before,
+.separador-modal::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.separador-modal span {
+  padding: 0 10px;
+}
+
 /* Checkbox Moderno */
 .checkbox-pagado {
   display: flex;
@@ -707,29 +844,80 @@
 @media (max-width: 1200px) {
   .controles {
     flex-direction: column;
+    align-items: stretch;
   }
 }
 
 @media (max-width: 768px) {
   .cuentas-por-pagar {
-    padding: 16px;
+    padding: 12px;
   }
 
   .nuevo-proveedor {
     flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .nuevo-proveedor input {
+    width: 100%;
+  }
+  
+  .nuevo-proveedor .btn {
+    width: 100%;
   }
 
   .modal-contenido {
     width: 95%;
     padding: 20px;
+    margin: 10px;
+    max-height: 90vh;
+    overflow-y: auto;
   }
 
   .modal-botones {
     flex-direction: column;
+    gap: 10px;
+  }
+  
+  .modal-botones .btn {
+    width: 100%;
   }
 
   .page-header h1 {
-    font-size: 1.6rem;
+    font-size: 1.5rem;
+  }
+  
+  .page-header p {
+    font-size: 0.9rem;
+  }
+  
+  .tabla-scroll {
+    /* Full bleed scroll en móvil */
+    margin-left: -12px;
+    margin-right: -12px;
+    padding-left: 12px;
+    padding-right: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .tabla-cuentas {
+    font-size: 0.85rem;
+  }
+  
+  .tabla-cuentas th, .tabla-cuentas td {
+    padding: 10px 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .controles {
+    gap: 15px;
+  }
+  .cuadro-resumen {
+    min-width: 100%;
+  }
+  .resumen-cards {
+    flex-direction: column;
   }
 }
 

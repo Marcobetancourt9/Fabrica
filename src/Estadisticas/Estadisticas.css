@@ -118,6 +118,39 @@
   box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
 }
 
+.selector-semana-wrapper {
+  width: 100%;
+}
+
+.select-semana-estadisticas {
+  width: 100%;
+  padding: 10px 16px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #f8fafc;
+  border-radius: 10px;
+  font-size: 14px;
+  font-family: 'Inter', sans-serif;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23cbd5e1' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  transition: all 0.3s;
+}
+
+.select-semana-estadisticas:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+.select-semana-estadisticas option {
+  background-color: #1e293b;
+  color: #f8fafc;
+}
+
 /* KPI Cards */
 .kpi-grid {
   display: grid;

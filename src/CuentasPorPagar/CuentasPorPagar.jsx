@@ -25,6 +25,40 @@ const CuentasPorPagar = () => {
   const [proveedorSeleccionado, setProveedorSeleccionado] = useState(null);
   const [mostrarModalDetalle, setMostrarModalDetalle] = useState(false);
   const [semanaAbierta, setSemanaAbierta] = useState(null);
+  const [mostrarDropdownSemanas, setMostrarDropdownSemanas] = useState(false);
+
+  // Generar todas las semanas del año actual (Lunes a Domingo)
+  const generarSemanasAnioActual = () => {
+    const anio = new Date().getFullYear();
+    const semanasAnio = [];
+    // Encontrar el primer lunes del año
+    let fecha = new Date(anio, 0, 1);
+    while (fecha.getDay() !== 1) {
+      fecha.setDate(fecha.getDate() + 1);
+    }
+    let numSemana = 1;
+    while (fecha.getFullYear() <= anio && numSemana <= 53) {
+      const inicio = new Date(fecha);
+      const fin = new Date(fecha);
+      fin.setDate(fin.getDate() + 6);
+      const formatoFecha = (f) => f.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const inicioStr = formatoFecha(inicio);
+      const finStr = formatoFecha(fin);
+      const key = `${inicioStr}-${finStr}`;
+      // Solo agregar si no existe ya en las semanas cargadas
+      const yaExiste = semanas.some(s => s.key === key);
+      semanasAnio.push({
+        inicio: inicioStr,
+        fin: finStr,
+        key,
+        numSemana,
+        yaExiste
+      });
+      fecha.setDate(fecha.getDate() + 7);
+      numSemana++;
+    }
+    return semanasAnio;
+  };
 
   // Generar semanas para 2025
   function generarSemanas2025() {
@@ -937,6 +971,50 @@ const CuentasPorPagar = () => {
         <div className="modal">
           <div className="modal-contenido">
             <h3>Agregar Nueva Semana</h3>
+
+            {/* Dropdown de semanas del año */}
+            <div className="semanas-anio-section">
+              <button
+                className="btn btn-dropdown-toggle"
+                onClick={() => setMostrarDropdownSemanas(!mostrarDropdownSemanas)}
+              >
+                📅 {mostrarDropdownSemanas ? 'Ocultar' : 'Seleccionar'} Semana del Año
+                <span className={`dropdown-arrow ${mostrarDropdownSemanas ? 'open' : ''}`}>▼</span>
+              </button>
+
+              {mostrarDropdownSemanas && (
+                <div className="dropdown-semanas-list">
+                  {generarSemanasAnioActual().map(s => (
+                    <button
+                      key={s.key}
+                      className={`dropdown-semana-item ${s.yaExiste ? 'ya-existe' : ''}`}
+                      disabled={s.yaExiste}
+                      onClick={() => {
+                        if (!s.yaExiste) {
+                          // Convertir DD/MM/YYYY a YYYY-MM-DD para los inputs date
+                          const [d1, m1, a1] = s.inicio.split('/');
+                          const [d2, m2, a2] = s.fin.split('/');
+                          setNuevaSemana({
+                            inicio: `${a1}-${m1}-${d1}`,
+                            fin: `${a2}-${m2}-${d2}`
+                          });
+                          setMostrarDropdownSemanas(false);
+                        }
+                      }}
+                    >
+                      <span className="semana-num">S{s.numSemana}</span>
+                      <span className="semana-rango">{s.inicio} — {s.fin}</span>
+                      {s.yaExiste && <span className="ya-existe-badge">Ya existe</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="separador-modal">
+              <span>o ingrese fechas manualmente</span>
+            </div>
+
             <div className="modal-inputs">
               <div className="input-group">
                 <label>Fecha de inicio:</label>
@@ -959,7 +1037,7 @@ const CuentasPorPagar = () => {
               <button className="btn btn-primary" onClick={agregarSemana}>
                 Agregar
               </button>
-              <button className="btn btn-cancelar" onClick={() => setMostrarModal(false)}>
+              <button className="btn btn-cancelar" onClick={() => { setMostrarModal(false); setMostrarDropdownSemanas(false); }}>
                 Cancelar
               </button>
             </div>

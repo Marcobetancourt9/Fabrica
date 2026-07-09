@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../../credentials';
-import { collection, getDocs, query, orderBy, limit as limitFirestore } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
   PieChart, Pie, Cell, LineChart, Line 
@@ -14,22 +14,38 @@ const Estadisticas = () => {
   const [tipoGrafica, setTipoGrafica] = useState('barras');
   const [limite, setLimite] = useState(5);
   const [paginaActual, setPaginaActual] = useState(1);
+  const [semanas, setSemanas] = useState([]);
+  const [semanaSeleccionada, setSemanaSeleccionada] = useState('todas');
   const itemsPorPagina = 10;
 
   useEffect(() => {
-    const cargarProveedores = async () => {
+    const cargarDatos = async () => {
       setCargando(true);
       try {
+        // Cargar Semanas
+        const configSnap = await getDoc(doc(db, 'configuracion', 'semanas_por_pagar'));
+        let semanasDisponibles = [];
+        if (configSnap.exists() && configSnap.data().lista) {
+          semanasDisponibles = configSnap.data().lista;
+          setSemanas(semanasDisponibles);
+        }
+
+        // Cargar Proveedores
         const querySnapshot = await getDocs(collection(db, 'por_pagar'));
         let data = [];
         
         querySnapshot.forEach((doc) => {
           const p = doc.data();
-          let deudaAnual = 0;
-          let pagadoAnual = 0;
+          let deudaTotal = 0;
+          let pagadoTotal = 0;
 
           if (p.registroDiario) {
-            Object.values(p.registroDiario).forEach(semanaObj => {
+            Object.entries(p.registroDiario).forEach(([semanaKey, semanaObj]) => {
+              // Filtrar por semana seleccionada
+              if (semanaSeleccionada !== 'todas' && semanaKey !== semanaSeleccionada) {
+                return;
+              }
+
               Object.values(semanaObj).forEach(diaData => {
                 const registrosDia = Array.isArray(diaData) ? diaData : [diaData];
                 registrosDia.forEach(reg => {
@@ -47,32 +63,38 @@ const Estadisticas = () => {
                     const tipoDoc = reg.tipoDocumento || 'Factura';
                     
                     if (tipoDoc === 'Pago' || tipoDoc === 'Nota de Crédito') {
-                      pagadoAnual += Math.abs(totalNeto);
+                      pagadoTotal += Math.abs(totalNeto);
                     } else {
-                      deudaAnual += totalNeto;
+                      deudaTotal += totalNeto;
                     }
+                    
+                    pagadoTotal += pagado; // Sumar campo 'pagado'
                   }
                 });
               });
             });
           }
 
-          if (p.deudas) {
+          // Sumar deudas antiguas solo si se ven 'todas' las semanas
+          if (p.deudas && semanaSeleccionada === 'todas') {
             p.deudas.forEach(d => {
-              deudaAnual += parseFloat(d.monto || 0);
-              pagadoAnual += parseFloat(d.pagado || 0);
+              deudaTotal += parseFloat(d.monto || 0);
+              pagadoTotal += parseFloat(d.pagado || 0);
             });
           }
 
-          const pendiente = Math.max(0, deudaAnual - pagadoAnual);
+          const pendiente = Math.max(0, deudaTotal - pagadoTotal);
 
-          data.push({ 
-            id: doc.id, 
-            nombre: p.nombre,
-            saldo: deudaAnual,
-            pagos: pagadoAnual,
-            pendiente: pendiente
-          });
+          // Solo agregar si hay actividad en ese periodo
+          if (deudaTotal > 0 || pagadoTotal > 0 || pendiente > 0) {
+            data.push({ 
+              id: doc.id, 
+              nombre: p.nombre,
+              saldo: deudaTotal,
+              pagos: pagadoTotal,
+              pendiente: pendiente
+            });
+          }
         });
         
         data.sort((a, b) => b.saldo - a.saldo);
@@ -83,14 +105,14 @@ const Estadisticas = () => {
         
         setProveedoresData(data);
       } catch (error) {
-        console.error('Error al cargar proveedores:', error);
+        console.error('Error al cargar datos estadísticos:', error);
       } finally {
         setCargando(false);
       }
     };
 
-    cargarProveedores();
-  }, [limite]);
+    cargarDatos();
+  }, [limite, semanaSeleccionada]);
 
   const totalSaldoTop = useMemo(() => proveedoresData.reduce((acc, p) => acc + parseFloat(p.saldo || 0), 0), [proveedoresData]);
   const totalPagosTop = useMemo(() => proveedoresData.reduce((acc, p) => acc + parseFloat(p.pagos || 0), 0), [proveedoresData]);
@@ -157,6 +179,24 @@ const Estadisticas = () => {
 
       {/* Controles: Límite, Período, Gráficas */}
       <div className="filtros-container">
+        <div className="filtro-card glass-panel">
+          <h2>Filtrar por Semana:</h2>
+          <div className="selector-semana-wrapper">
+            <select 
+              className="select-semana-estadisticas"
+              value={semanaSeleccionada} 
+              onChange={(e) => setSemanaSeleccionada(e.target.value)}
+            >
+              <option value="todas">Todas las semanas (Consolidado)</option>
+              {semanas.map((s, idx) => (
+                <option key={s.key} value={s.key}>
+                  Semana {idx + 1}: {s.inicio} a {s.fin}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         <div className="filtro-card glass-panel">
           <h2>Mostrar Proveedores:</h2>
           <div className="botones-limite">

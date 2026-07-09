@@ -46,6 +46,18 @@
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+.info-badge {
+  background: rgba(59, 130, 246, 0.15);
+  color: #93c5fd;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  border: 1px dashed rgba(59, 130, 246, 0.3);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .buscador {
   position: relative;
   flex-grow: 1;
@@ -396,18 +408,50 @@ input::-webkit-inner-spin-button {
   
   .tabla-container {
     overflow-x: auto;
+    border-radius: 8px;
   }
   
   .tabla-proveedores {
-    min-width: 600px;
+    min-width: 600px; /* Force horizontal scroll */
   }
   
   .acciones {
     flex-wrap: wrap;
   }
   
+  .app-header {
+    padding: 20px;
+  }
+
   .app-header h1 {
-    font-size: 24px;
+    font-size: 20px;
+  }
+
+  .app-header p {
+    font-size: 14px;
+  }
+
+  .info-badge {
+    font-size: 0.8rem;
+    padding: 8px 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .total-deudas-container {
+    padding: 10px;
+  }
+  .tabla-proveedores td, .tabla-proveedores th {
+    padding: 12px 8px;
+    font-size: 14px;
+  }
+  .avatar {
+    width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+  .monto {
+    padding: 4px 8px;
   }
 }
 
