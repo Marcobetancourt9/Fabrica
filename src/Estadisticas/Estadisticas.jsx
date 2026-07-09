@@ -16,6 +16,7 @@ const Estadisticas = () => {
   const [paginaActual, setPaginaActual] = useState(1);
   const [semanas, setSemanas] = useState([]);
   const [semanaSeleccionada, setSemanaSeleccionada] = useState('todas');
+  const [mesSeleccionado, setMesSeleccionado] = useState('todos');
   const itemsPorPagina = 10;
 
   useEffect(() => {
@@ -46,7 +47,15 @@ const Estadisticas = () => {
                 return;
               }
 
-              Object.values(semanaObj).forEach(diaData => {
+              Object.entries(semanaObj).forEach(([fechaDia, diaData]) => {
+                // Filtrar por mes seleccionado (fechaDia formato YYYY-MM-DD)
+                if (mesSeleccionado !== 'todos') {
+                  const mesFecha = parseInt(fechaDia.split('-')[1], 10);
+                  if (mesFecha !== parseInt(mesSeleccionado, 10)) {
+                    return; // No es del mes
+                  }
+                }
+
                 const registrosDia = Array.isArray(diaData) ? diaData : [diaData];
                 registrosDia.forEach(reg => {
                   if (((parseFloat(reg.monto) || 0) !== 0 || (parseFloat(reg.pagado) || 0) !== 0)) {
@@ -75,8 +84,8 @@ const Estadisticas = () => {
             });
           }
 
-          // Sumar deudas antiguas solo si se ven 'todas' las semanas
-          if (p.deudas && semanaSeleccionada === 'todas') {
+          // Sumar deudas antiguas solo si se ven 'todas' las semanas y 'todos' los meses
+          if (p.deudas && semanaSeleccionada === 'todas' && mesSeleccionado === 'todos') {
             p.deudas.forEach(d => {
               deudaTotal += parseFloat(d.monto || 0);
               pagadoTotal += parseFloat(d.pagado || 0);
@@ -112,7 +121,7 @@ const Estadisticas = () => {
     };
 
     cargarDatos();
-  }, [limite, semanaSeleccionada]);
+  }, [limite, semanaSeleccionada, mesSeleccionado]);
 
   const totalSaldoTop = useMemo(() => proveedoresData.reduce((acc, p) => acc + parseFloat(p.saldo || 0), 0), [proveedoresData]);
   const totalPagosTop = useMemo(() => proveedoresData.reduce((acc, p) => acc + parseFloat(p.pagos || 0), 0), [proveedoresData]);
@@ -180,14 +189,45 @@ const Estadisticas = () => {
       {/* Controles: Límite, Período, Gráficas */}
       <div className="filtros-container">
         <div className="filtro-card glass-panel">
+          <h2>Filtrar por Mes:</h2>
+          <div className="selector-semana-wrapper">
+            <select 
+              className="select-semana-estadisticas"
+              value={mesSeleccionado} 
+              onChange={(e) => {
+                setMesSeleccionado(e.target.value);
+                setSemanaSeleccionada('todas'); // Limpiar filtro de semana
+              }}
+            >
+              <option value="todos">Todos los meses</option>
+              <option value="1">Enero</option>
+              <option value="2">Febrero</option>
+              <option value="3">Marzo</option>
+              <option value="4">Abril</option>
+              <option value="5">Mayo</option>
+              <option value="6">Junio</option>
+              <option value="7">Julio</option>
+              <option value="8">Agosto</option>
+              <option value="9">Septiembre</option>
+              <option value="10">Octubre</option>
+              <option value="11">Noviembre</option>
+              <option value="12">Diciembre</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="filtro-card glass-panel">
           <h2>Filtrar por Semana:</h2>
           <div className="selector-semana-wrapper">
             <select 
               className="select-semana-estadisticas"
               value={semanaSeleccionada} 
-              onChange={(e) => setSemanaSeleccionada(e.target.value)}
+              onChange={(e) => {
+                setSemanaSeleccionada(e.target.value);
+                setMesSeleccionado('todos'); // Limpiar filtro de mes
+              }}
             >
-              <option value="todas">Todas las semanas (Consolidado)</option>
+              <option value="todas">Todas las semanas</option>
               {semanas.map((s, idx) => (
                 <option key={s.key} value={s.key}>
                   Semana {idx + 1}: {s.inicio} a {s.fin}

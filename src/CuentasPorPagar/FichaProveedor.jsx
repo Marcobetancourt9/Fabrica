@@ -65,11 +65,15 @@ const FichaProveedor = ({
       registroDia.iva8 = '0';
     }
 
-    registroDia.retencion = (Math.abs(montoNum) * 0.0125).toFixed(2);
+    if (registroDia.aplicaRetencionMunicipal === false) {
+      registroDia.retencion = '0';
+    } else {
+      registroDia.retencion = (Math.abs(montoNum) * 0.0125).toFixed(2);
+    }
 
     const montoIva = parseFloat(tasa === '16' ? registroDia.iva16 : (tasa === '8' ? registroDia.iva8 : '0')) || 0;
     const pctRetencionIva = registroDia.porcentajeRetencionIva || '75';
-    if (tasa === '0') {
+    if (tasa === '0' || registroDia.aplicaRetencionIva === false) {
       registroDia.retencionIva = '0';
     } else {
       registroDia.retencionIva = (Math.abs(montoIva) * (parseFloat(pctRetencionIva) / 100)).toFixed(2);
@@ -106,6 +110,7 @@ const FichaProveedor = ({
     if (!arr) arr = [];
     if (!Array.isArray(arr)) arr = [{ id: 'legacy-' + fechaActiva, ...arr }];
 
+    const esResta = tipoDoc === 'Pago' || tipoDoc === 'Nota de Crédito';
     const newDoc = {
       id: Date.now().toString(),
       tipoDocumento: tipoDoc,
@@ -113,7 +118,9 @@ const FichaProveedor = ({
       monto: '',
       pagado: '',
       tasaIva: tipoDoc === 'Pago' ? '0' : '16', // Por defecto los pagos son exentos
-      porcentajeRetencionIva: '75'
+      porcentajeRetencionIva: '75',
+      aplicaRetencionMunicipal: esResta ? false : true,
+      aplicaRetencionIva: esResta ? false : true
     };
     
     // Lo guardamos ya pre-calculado
@@ -393,11 +400,23 @@ const FichaProveedor = ({
                               </div>
                               {/* ─── Ret. Municipal auto-calculada (1.25%) ─── */}
                               <div className="f-field calc">
-                                <label>Ret. Municipal (1,25%)</label>
-                                <div className="auto-calc-display ret-municipal">
+                                <label>
+                                  Ret. Municipal (1,25%)
+                                  {esResta && (
+                                    <label className="toggle-switch-small">
+                                      <input 
+                                        type="checkbox" 
+                                        checked={dData.aplicaRetencionMunicipal !== false} 
+                                        onChange={(e) => manejarCambioDoc(docId, 'aplicaRetencionMunicipal', e.target.checked)}
+                                      />
+                                      <span className="slider-small round"></span>
+                                    </label>
+                                  )}
+                                </label>
+                                <div className={`auto-calc-display ret-municipal ${dData.aplicaRetencionMunicipal === false ? 'disabled' : ''}`}>
                                   <span className="auto-calc-icon">🏛️</span>
                                   <span className="auto-calc-value">${parseFloat(dData.retencion || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                  <span className="auto-calc-label">Auto</span>
+                                  <span className="auto-calc-label">{dData.aplicaRetencionMunicipal === false ? 'Desactivado' : 'Auto'}</span>
                                 </div>
                               </div>
                             </div>
@@ -417,11 +436,24 @@ const FichaProveedor = ({
                               {/* ─── Retención de IVA ─── */}
                               {tasaActual !== '0' && (
                                 <div className="f-field calc retencion-iva-field">
-                                  <label>Retención de IVA</label>
-                                  <div className="retencion-iva-container">
+                                  <label>
+                                    Retención de IVA
+                                    {esResta && (
+                                      <label className="toggle-switch-small">
+                                        <input 
+                                          type="checkbox" 
+                                          checked={dData.aplicaRetencionIva !== false} 
+                                          onChange={(e) => manejarCambioDoc(docId, 'aplicaRetencionIva', e.target.checked)}
+                                        />
+                                        <span className="slider-small round"></span>
+                                      </label>
+                                    )}
+                                  </label>
+                                  <div className={`retencion-iva-container ${dData.aplicaRetencionIva === false ? 'disabled' : ''}`}>
                                     <div className="retencion-pct-selector">
                                       <button
                                         type="button"
+                                        disabled={dData.aplicaRetencionIva === false}
                                         className={`pct-option ${(dData.porcentajeRetencionIva || '75') === '75' ? 'selected' : ''}`}
                                         onClick={() => manejarCambioDoc(docId, 'porcentajeRetencionIva', '75')}
                                       >
@@ -429,6 +461,7 @@ const FichaProveedor = ({
                                       </button>
                                       <button
                                         type="button"
+                                        disabled={dData.aplicaRetencionIva === false}
                                         className={`pct-option ${(dData.porcentajeRetencionIva || '75') === '100' ? 'selected' : ''}`}
                                         onClick={() => manejarCambioDoc(docId, 'porcentajeRetencionIva', '100')}
                                       >
@@ -438,7 +471,7 @@ const FichaProveedor = ({
                                     <div className="auto-calc-display ret-iva">
                                       <span className="auto-calc-icon">🧾</span>
                                       <span className="auto-calc-value">${parseFloat(dData.retencionIva || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
-                                      <span className="auto-calc-label">{dData.porcentajeRetencionIva || '75'}% del IVA</span>
+                                      <span className="auto-calc-label">{dData.aplicaRetencionIva === false ? 'Desactivado' : `${dData.porcentajeRetencionIva || '75'}% del IVA`}</span>
                                     </div>
                                   </div>
                                 </div>

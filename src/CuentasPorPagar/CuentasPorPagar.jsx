@@ -5,6 +5,17 @@ import { InstallAppButton } from '../PWA/InstallAppButton';
 import FichaProveedor from './FichaProveedor';
 import './CuentasPorPagar.css';
 
+const ordenarSemanas = (listaSemanas) => {
+  return [...listaSemanas].sort((a, b) => {
+    const parseDate = (dateStr) => {
+      if (!dateStr) return 0;
+      const [day, month, year] = dateStr.split('/');
+      return new Date(year, month - 1, day).getTime();
+    };
+    return parseDate(a.inicio) - parseDate(b.inicio);
+  });
+};
+
 const CuentasPorPagar = () => {
   const [proveedores, setProveedores] = useState([]);
   const [nuevoProveedor, setNuevoProveedor] = useState({ 
@@ -99,9 +110,9 @@ const CuentasPorPagar = () => {
         const configRef = doc(db, 'configuracion', 'semanas_por_pagar');
         const configSnap = await getDoc(configRef);
         if (configSnap.exists()) {
-          setSemanas(configSnap.data().lista || []);
+          setSemanas(ordenarSemanas(configSnap.data().lista || []));
         } else {
-          const semanasIniciales = generarSemanas2025();
+          const semanasIniciales = ordenarSemanas(generarSemanas2025());
           await setDoc(configRef, { lista: semanasIniciales, inicializado: true });
           setSemanas(semanasIniciales);
         }
@@ -644,7 +655,9 @@ const CuentasPorPagar = () => {
       creadaManualmente: true
     };
     
-    setSemanas([...semanas, semana]);
+    const nuevaListaSemanas = ordenarSemanas([...semanas, semana]);
+    
+    setSemanas(nuevaListaSemanas);
     
     // Actualizar todos los proveedores con la nueva semana
     const proveedoresActualizados = proveedores.map(proveedor => ({
@@ -661,7 +674,7 @@ const CuentasPorPagar = () => {
     try {
       // Registrar nueva semana en la BD global
       await updateDoc(doc(db, 'configuracion', 'semanas_por_pagar'), {
-        lista: [...semanas, semana]
+        lista: nuevaListaSemanas
       });
 
       proveedoresActualizados.forEach(async (proveedor) => {
