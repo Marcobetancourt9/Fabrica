@@ -414,6 +414,34 @@
   color: #ffffff;
 }
 
+/* Clickable provider for CSV download */
+.prov-descargable {
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: all 0.25s ease;
+}
+
+.prov-descargable:hover {
+  background: rgba(59, 130, 246, 0.15);
+  transform: translateX(2px);
+}
+
+.prov-descargable:active {
+  transform: scale(0.98);
+}
+
+.prov-download-icon {
+  opacity: 0;
+  font-size: 14px;
+  transition: opacity 0.25s ease;
+  margin-left: 4px;
+}
+
+.prov-descargable:hover .prov-download-icon {
+  opacity: 1;
+}
+
 .progress-bar-container {
   display: flex;
   align-items: center;

@@ -1,10 +1,12 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../../credentials';
-import { collection, getDocs } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
 import './TotalDeudas.css';
 
 const TotalDeudas = () => {
   const [proveedores, setProveedores] = useState([]);
+  const [proveedoresRaw, setProveedoresRaw] = useState([]);
+  const [semanas, setSemanas] = useState([]);
   const [busqueda, setBusqueda] = useState('');
   const [cargando, setCargando] = useState(true);
 
@@ -13,8 +15,15 @@ const TotalDeudas = () => {
     const cargarProveedores = async () => {
       setCargando(true);
       try {
+        // Cargar semanas
+        const configSnap = await getDoc(doc(db, 'configuracion', 'semanas_por_pagar'));
+        if (configSnap.exists() && configSnap.data().lista) {
+          setSemanas(configSnap.data().lista);
+        }
+
         const querySnapshot = await getDocs(collection(db, 'por_pagar'));
         const proveedoresData = [];
+        const rawData = [];
         
         querySnapshot.forEach((doc) => {
           const p = doc.data();
@@ -73,12 +82,14 @@ const TotalDeudas = () => {
             pagos: pagadoAnual,
             pendiente: pendiente
           });
+          rawData.push({ id: doc.id, ...p });
         });
         
         // Ordenar por nombre alfabéticamente
         proveedoresData.sort((a, b) => a.nombre.localeCompare(b.nombre));
         
         setProveedores(proveedoresData);
+        setProveedoresRaw(rawData);
       } catch (error) {
         console.error('Error al cargar proveedores:', error);
       } finally {
@@ -88,6 +99,118 @@ const TotalDeudas = () => {
 
     cargarProveedores();
   }, []);
+
+  // Descargar Reporte Histórico por Proveedor (CSV)
+  const descargarReporteProveedorCSV = (proveedorResumen) => {
+    const p = proveedoresRaw.find(pr => pr.id === proveedorResumen.id);
+    if (!p) {
+      alert('No se encontraron datos completos del proveedor.');
+      return;
+    }
+
+    const titular = "Inversiones pincho pan express II C.A.";
+    const subTitular = `Estado de Cuenta Histórico: ${p.nombre} (RIF: ${p.rif || '-'})`;
+
+    const headers = [
+      'Fecha', 'Tipo de Documento', 'Nro Referencia',
+      'Monto Base', 'IVA 16%', 'IVA 8%', 'Ret. Municipal', 'Ret. IVA', '% Ret. IVA', 'Total Bruto',
+      'Pagado', 'Saldo Acumulado', 'Referencia/Pago', 'Observaciones'
+    ];
+
+    let todasLasTransacciones = [];
+
+    semanas.forEach(semana => {
+      const registroSemana = p.registroDiario?.[semana.key] || {};
+      const [d, m, a] = semana.inicio.split('/').map(Number);
+      
+      [0, 1, 2, 3, 4, 5, 6].forEach(i => {
+        const fechaBase = new Date(a, m - 1, d);
+        fechaBase.setDate(fechaBase.getDate() + i);
+        const dk = fechaBase.toISOString().split('T')[0];
+        
+        const diaData = registroSemana[dk];
+        if (diaData) {
+          const registrosDia = Array.isArray(diaData) ? diaData : [diaData];
+          
+          registrosDia.forEach(dData => {
+            if (((parseFloat(dData.monto) || 0) !== 0 || (parseFloat(dData.pagado) || 0) !== 0)) {
+              todasLasTransacciones.push({ ...dData, dk });
+            }
+          });
+        }
+      });
+    });
+
+    // Ordenar cronológicamente
+    todasLasTransacciones.sort((a, b) => {
+      const fechaA = new Date((a.fechaOperacion || a.dk) + 'T00:00:00');
+      const fechaB = new Date((b.fechaOperacion || b.dk) + 'T00:00:00');
+      return fechaA - fechaB;
+    });
+
+    const filasTransactions = [];
+    let saldoAcumulado = 0;
+
+    todasLasTransacciones.forEach(dData => {
+      const base = parseFloat(dData.monto) || 0;
+      const sign = base < 0 ? -1 : 1;
+      const absBase = Math.abs(base);
+      
+      let absIva16 = 0, absIva8 = 0;
+      if (dData.tasaIva === 'Manual') {
+         absIva16 = Math.abs(parseFloat(dData.ivaManual) || 0);
+      } else {
+         absIva16 = Math.abs(parseFloat(dData.iva16) || 0);
+         absIva8 = Math.abs(parseFloat(dData.iva8) || 0);
+      }
+      
+      const absRet = Math.abs(parseFloat(dData.retencion) || 0);
+      const absRetIva = Math.abs(parseFloat(dData.retencionIva) || 0);
+      const pagado = parseFloat(dData.pagado) || 0;
+      
+      const totalNeto = ((absBase + absIva16 + absIva8) - absRet - absRetIva) * sign;
+      
+      saldoAcumulado = saldoAcumulado + totalNeto - pagado;
+      const saldoMostrar = Math.max(0, saldoAcumulado);
+
+      const formatearNum = (num) => num.toFixed(2).replace('.', ',');
+
+      filasTransactions.push([
+        `"${dData.fechaOperacion || dData.dk}"`,
+        `"${dData.tipoDocumento || 'Factura'}"`,
+        `"${dData.numeroFactura || '-'}"`,
+        formatearNum(base),
+        formatearNum(absIva16 * sign),
+        formatearNum(absIva8 * sign),
+        formatearNum(absRet * sign),
+        formatearNum(absRetIva * sign),
+        `"${dData.aplicaRetencionIva === false ? 'No' : (dData.porcentajeRetencionIva || '75') + '%'}"`,
+        formatearNum(totalNeto),
+        formatearNum(pagado),
+        formatearNum(saldoMostrar),
+        `"${dData.referencia || '-'}"`,
+        `"${(dData.observaciones || '').replace(/\n/g, ' ')}"`
+      ]);
+    });
+
+    const csvContent = [
+      titular,
+      subTitular,
+      '',
+      headers.join(';'),
+      ...filasTransactions.map(f => f.join(';'))
+    ].join('\n');
+
+    const universalBOM = "\uFEFF";
+    const blob = new Blob([universalBOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Estado_Cuenta_${p.nombre.replace(/\s+/g, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Filtrar proveedores por búsqueda
   const proveedoresFiltrados = proveedores.filter(proveedor =>
@@ -154,9 +277,10 @@ const TotalDeudas = () => {
               proveedoresFiltrados.map((proveedor) => (
                 <tr key={proveedor.id}>
                   <td>
-                    <div className="nombre-proveedor">
+                    <div className="nombre-proveedor nombre-descargable" onClick={() => descargarReporteProveedorCSV(proveedor)} title="Click para descargar reporte CSV del proveedor">
                       <span className="avatar">{proveedor.nombre.charAt(0).toUpperCase()}</span>
                       {proveedor.nombre}
+                      <span className="download-icon">📥</span>
                     </div>
                   </td>
                   <td className="text-right">

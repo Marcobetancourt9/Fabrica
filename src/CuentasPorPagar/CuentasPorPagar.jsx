@@ -24,7 +24,7 @@ const CuentasPorPagar = () => {
   });
   const [filtro, setFiltro] = useState('');
   const [semanaFiltro, setSemanaFiltro] = useState('');
-  const [mesFiltro, setMesFiltro] = useState('');
+  const [mesFiltro, setMesFiltro] = useState(String(new Date().getMonth() + 1));
   const [diaFiltro, setDiaFiltro] = useState('');
   const [semanas, setSemanas] = useState([]);
   const [mostrarModal, setMostrarModal] = useState(false);

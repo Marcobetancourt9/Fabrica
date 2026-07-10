@@ -9,6 +9,7 @@ import './Estadisticas.css';
 
 const Estadisticas = () => {
   const [proveedoresData, setProveedoresData] = useState([]);
+  const [proveedoresRaw, setProveedoresRaw] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [periodo, setPeriodo] = useState('mes');
   const [tipoGrafica, setTipoGrafica] = useState('barras');
@@ -34,6 +35,7 @@ const Estadisticas = () => {
         // Cargar Proveedores
         const querySnapshot = await getDocs(collection(db, 'por_pagar'));
         let data = [];
+        let rawData = [];
         
         querySnapshot.forEach((doc) => {
           const p = doc.data();
@@ -104,6 +106,7 @@ const Estadisticas = () => {
               pendiente: pendiente
             });
           }
+          rawData.push({ id: doc.id, ...p });
         });
         
         data.sort((a, b) => b.saldo - a.saldo);
@@ -113,6 +116,7 @@ const Estadisticas = () => {
         }
         
         setProveedoresData(data);
+        setProveedoresRaw(rawData);
       } catch (error) {
         console.error('Error al cargar datos estadísticos:', error);
       } finally {
@@ -144,6 +148,117 @@ const Estadisticas = () => {
   const formatPercentage = (value) => `${value.toFixed(1)}%`;
 
   const colores = ['#4a6491', '#2c3e50', '#3498db', '#2ecc71', '#f39c12', '#e74c3c', '#9b59b6', '#1abc9c', '#95a5a6', '#d35400'];
+
+  // Descargar Reporte Histórico por Proveedor (CSV)
+  const descargarReporteProveedorCSV = (proveedorResumen) => {
+    const p = proveedoresRaw.find(pr => pr.id === proveedorResumen.id);
+    if (!p) {
+      alert('No se encontraron datos completos del proveedor.');
+      return;
+    }
+
+    const titular = "Inversiones pincho pan express II C.A.";
+    const subTitular = `Estado de Cuenta Histórico: ${p.nombre} (RIF: ${p.rif || '-'})`;
+
+    const headers = [
+      'Fecha', 'Tipo de Documento', 'Nro Referencia',
+      'Monto Base', 'IVA 16%', 'IVA 8%', 'Ret. Municipal', 'Ret. IVA', '% Ret. IVA', 'Total Bruto',
+      'Pagado', 'Saldo Acumulado', 'Referencia/Pago', 'Observaciones'
+    ];
+
+    let todasLasTransacciones = [];
+
+    semanas.forEach(semana => {
+      const registroSemana = p.registroDiario?.[semana.key] || {};
+      const [d, m, a] = semana.inicio.split('/').map(Number);
+      
+      [0, 1, 2, 3, 4, 5, 6].forEach(i => {
+        const fechaBase = new Date(a, m - 1, d);
+        fechaBase.setDate(fechaBase.getDate() + i);
+        const dk = fechaBase.toISOString().split('T')[0];
+        
+        const diaData = registroSemana[dk];
+        if (diaData) {
+          const registrosDia = Array.isArray(diaData) ? diaData : [diaData];
+          
+          registrosDia.forEach(dData => {
+            if (((parseFloat(dData.monto) || 0) !== 0 || (parseFloat(dData.pagado) || 0) !== 0)) {
+              todasLasTransacciones.push({ ...dData, dk });
+            }
+          });
+        }
+      });
+    });
+
+    todasLasTransacciones.sort((a, b) => {
+      const fechaA = new Date((a.fechaOperacion || a.dk) + 'T00:00:00');
+      const fechaB = new Date((b.fechaOperacion || b.dk) + 'T00:00:00');
+      return fechaA - fechaB;
+    });
+
+    const filasTransactions = [];
+    let saldoAcumulado = 0;
+
+    todasLasTransacciones.forEach(dData => {
+      const base = parseFloat(dData.monto) || 0;
+      const sign = base < 0 ? -1 : 1;
+      const absBase = Math.abs(base);
+      
+      let absIva16 = 0, absIva8 = 0;
+      if (dData.tasaIva === 'Manual') {
+         absIva16 = Math.abs(parseFloat(dData.ivaManual) || 0);
+      } else {
+         absIva16 = Math.abs(parseFloat(dData.iva16) || 0);
+         absIva8 = Math.abs(parseFloat(dData.iva8) || 0);
+      }
+      
+      const absRet = Math.abs(parseFloat(dData.retencion) || 0);
+      const absRetIva = Math.abs(parseFloat(dData.retencionIva) || 0);
+      const pagado = parseFloat(dData.pagado) || 0;
+      
+      const totalNeto = ((absBase + absIva16 + absIva8) - absRet - absRetIva) * sign;
+      
+      saldoAcumulado = saldoAcumulado + totalNeto - pagado;
+      const saldoMostrar = Math.max(0, saldoAcumulado);
+
+      const formatearNum = (num) => num.toFixed(2).replace('.', ',');
+
+      filasTransactions.push([
+        `"${dData.fechaOperacion || dData.dk}"`,
+        `"${dData.tipoDocumento || 'Factura'}"`,
+        `"${dData.numeroFactura || '-'}"`,
+        formatearNum(base),
+        formatearNum(absIva16 * sign),
+        formatearNum(absIva8 * sign),
+        formatearNum(absRet * sign),
+        formatearNum(absRetIva * sign),
+        `"${dData.aplicaRetencionIva === false ? 'No' : (dData.porcentajeRetencionIva || '75') + '%'}"`,
+        formatearNum(totalNeto),
+        formatearNum(pagado),
+        formatearNum(saldoMostrar),
+        `"${dData.referencia || '-'}"`,
+        `"${(dData.observaciones || '').replace(/\n/g, ' ')}"`
+      ]);
+    });
+
+    const csvContent = [
+      titular,
+      subTitular,
+      '',
+      headers.join(';'),
+      ...filasTransactions.map(f => f.join(';'))
+    ].join('\n');
+
+    const universalBOM = "\uFEFF";
+    const blob = new Blob([universalBOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Estado_Cuenta_${p.nombre.replace(/\s+/g, '_')}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   // Pagination for table
   const totalPaginas = Math.ceil(proveedoresData.length / itemsPorPagina);
@@ -413,11 +528,12 @@ const Estadisticas = () => {
                   <tr key={p.id}>
                     <td><span className="idx-badge">{absoluteIndex}</span></td>
                     <td>
-                      <div className="prov-info">
+                      <div className="prov-info prov-descargable" onClick={() => descargarReporteProveedorCSV(p)} title="Click para descargar reporte CSV del proveedor">
                         <div className="prov-avatar" style={{ backgroundColor: colores[absoluteIndex % colores.length] }}>
                           {p.nombre.charAt(0).toUpperCase()}
                         </div>
                         <span className="prov-name">{p.nombre}</span>
+                        <span className="prov-download-icon">📥</span>
                       </div>
                     </td>
                     <td className="text-right font-bold text-primary">{formatCurrency(p.saldo || 0)}</td>
