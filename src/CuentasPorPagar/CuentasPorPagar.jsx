@@ -3,6 +3,7 @@ import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, setDoc, getDoc 
 import { db, auth } from '../../credentials';
 import { InstallAppButton } from '../PWA/InstallAppButton';
 import FichaProveedor from './FichaProveedor';
+import * as XLSX from 'xlsx';
 import './CuentasPorPagar.css';
 
 const ordenarSemanas = (listaSemanas) => {
@@ -18,9 +19,9 @@ const ordenarSemanas = (listaSemanas) => {
 
 const CuentasPorPagar = () => {
   const [proveedores, setProveedores] = useState([]);
-  const [nuevoProveedor, setNuevoProveedor] = useState({ 
-    nombre: '', 
-    deudas: [] 
+  const [nuevoProveedor, setNuevoProveedor] = useState({
+    nombre: '',
+    deudas: []
   });
   const [filtro, setFiltro] = useState('');
   const [semanaFiltro, setSemanaFiltro] = useState('');
@@ -40,7 +41,7 @@ const CuentasPorPagar = () => {
 
   const userEmail = auth?.currentUser?.email;
   const puedeEliminar = userEmail === 'marco.betancourt@correo.unimet.edu.ve';
-  const puedeEditar = puedeEliminar || userEmail === 'reinaldo.pinchopan@gmail.com' || userEmail === 'marcobetancourt2006@gmail.com';
+  const puedeEditar = puedeEliminar || userEmail === 'reinaldo.pinchopan@gmail.com' || userEmail === 'cxp.pinchopan@gmail.com' || userEmail === 'marcobetancourt2006@gmail.com';
 
   // Generar todas las semanas del año actual (Lunes a Domingo)
   const generarSemanasAnioActual = () => {
@@ -80,16 +81,16 @@ const CuentasPorPagar = () => {
     const semanas = [];
     let fechaInicio = new Date(2025, 0, 1);
     const fechaFin = new Date(2025, 11, 31);
-    
+
     while (fechaInicio <= fechaFin) {
       const inicioSemana = new Date(fechaInicio);
       const finSemana = new Date(fechaInicio);
       finSemana.setDate(finSemana.getDate() + 6);
-      
+
       const formatoFecha = (fecha) => {
         return fecha.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
       };
-      
+
       semanas.push({
         inicio: formatoFecha(inicioSemana),
         fin: formatoFecha(finSemana),
@@ -132,11 +133,11 @@ const CuentasPorPagar = () => {
     const registroSemana = proveedor.registroDiario?.[semanaKey] || {};
     let montoTotal = 0;
     let pagadoTotal = 0;
-    
+
     // Sumar montos de los días incluyendo impuestos y retenciones
     Object.values(registroSemana).forEach(dia => {
       const registrosDia = Array.isArray(dia) ? dia : [dia];
-      
+
       registrosDia.forEach(d => {
         // En los registros, la retención se almacena en positivo o negativo dependiendo del tipo de doc,
         // pero la regla general es: Monto + IVA - RetMunicipal - RetIVA
@@ -148,9 +149,9 @@ const CuentasPorPagar = () => {
         const absIva8 = Math.abs(parseFloat(d.iva8) || 0);
         const absRetencion = Math.abs(parseFloat(d.retencion) || 0);
         const absRetencionIva = Math.abs(parseFloat(d.retencionIva) || 0);
-        
+
         const totalDocumentoNeto = (absBase + absIva16 + absIva8) - absRetencion - absRetencionIva;
-        
+
         montoTotal += (totalDocumentoNeto * sign);
         pagadoTotal += parseFloat(d.pagado) || 0;
       });
@@ -174,7 +175,7 @@ const CuentasPorPagar = () => {
       alert('Por favor ingrese un nombre para el proveedor');
       return;
     }
-    
+
     try {
       // Inicializar deudas para todas las semanas
       const deudasInicializadas = semanas.map(semana => ({
@@ -183,7 +184,7 @@ const CuentasPorPagar = () => {
         pagado: 0,
         pagadoCompleto: false
       }));
-      
+
       const proveedorConDeudas = {
         nombre: nuevoProveedor.nombre,
         deudas: deudasInicializadas,
@@ -191,7 +192,7 @@ const CuentasPorPagar = () => {
         encargado: '',
         registroDiario: {}
       };
-      
+
       const docRef = await addDoc(collection(db, 'por_pagar'), proveedorConDeudas);
       setProveedores([...proveedores, { id: docRef.id, ...proveedorConDeudas }]);
       setNuevoProveedor({ nombre: '', deudas: [] });
@@ -219,7 +220,7 @@ const CuentasPorPagar = () => {
 
       await updateDoc(pRef, payload);
 
-      setProveedores(proveedores.map(p => 
+      setProveedores(proveedores.map(p =>
         p.id === proveedorSeleccionado.id ? { ...p, ...payload } : p
       ));
 
@@ -232,183 +233,117 @@ const CuentasPorPagar = () => {
     }
   };
 
-  // Descargar CSV por semana (Reporte Contable Detallado)
-  const descargarCSV = (semanaKey) => {
-    const semana = semanas.find(s => s.key === semanaKey);
-    const diasSemana = [0, 1, 2, 3, 4, 5, 6].map(i => {
-      const [d, m, a] = semana.inicio.split('/').map(Number);
-      const f = new Date(a, m - 1, d);
-      f.setDate(f.getDate() + i);
-      return f.toISOString().split('T')[0];
-    });
-
-    const titular = "Inversiones pincho pan express II C.A.";
-    const subTitular = `Reporte de Cuentas por Pagar - Semana: ${semana.inicio} al ${semana.fin}`;
-
-    // Encabezados contables solicitados
-    const headers = [
-      'Proveedor', 'RIF', 'Encargado', 'Fecha', 'Tipo de Documento', 'Nro Factura',
-      'Monto Base', 'IVA 16%', 'IVA 8%', 'Ret. Municipal', 'Total Bruto',
-      'Pagado', 'Saldo', 'Referencia/Pago', 'Observaciones'
-    ];
-
-    const filasTransactions = [];
-
-    proveedores.forEach(p => {
-      const registroSemana = p.registroDiario?.[semanaKey] || {};
-      
-      diasSemana.forEach(dk => {
-        const diaData = registroSemana[dk];
-        if (diaData) {
-          const registrosDia = Array.isArray(diaData) ? diaData : [diaData];
-          
-          registrosDia.forEach(d => {
-            if (((parseFloat(d.monto) || 0) !== 0 || (parseFloat(d.pagado) || 0) !== 0)) {
-              const base = parseFloat(d.monto) || 0;
-              const sign = base < 0 ? -1 : 1;
-              const absBase = Math.abs(base);
-              const absIva16 = Math.abs(parseFloat(d.iva16) || 0);
-              const absIva8 = Math.abs(parseFloat(d.iva8) || 0);
-              const absRet = Math.abs(parseFloat(d.retencion) || 0);
-              const absRetIva = Math.abs(parseFloat(d.retencionIva) || 0);
-              const pagado = parseFloat(d.pagado) || 0;
-              
-              const totalNeto = ((absBase + absIva16 + absIva8) - absRet - absRetIva) * sign;
-              const saldo = Math.max(0, totalNeto - pagado); // El saldo no puede ser negativo en el CSV
-  
-              const formatearNum = (num) => num.toFixed(2).replace('.', ',');
-  
-              filasTransactions.push([
-                `"${p.nombre}"`,
-                `"${p.rif || '-'}"`,
-                `"${p.encargado || '-'}"`,
-                `"${d.fechaOperacion || dk}"`,
-                `"${d.tipoDocumento || 'Factura'}"`,
-                `"${d.numeroFactura || '-'}"`,
-                formatearNum(base),
-                formatearNum(absIva16 * sign),
-                formatearNum(absIva8 * sign),
-                formatearNum(absRet * sign), // Mostrar las retenciones con su signo respectivo
-                formatearNum(totalNeto),
-                formatearNum(pagado),
-                formatearNum(saldo),
-                `"${d.referencia || '-'}"`,
-                `"${(d.observaciones || '').replace(/\n/g, ' ')}"`
-              ]);
-            }
-          });
-        }
-      });
-    });
-
-    // Construcción del contenido CSV con Titular
-    const csvContent = [
-      titular,
-      subTitular,
-      '', // Espacio en blanco
-      headers.join(';'),
-      ...filasTransactions.map(f => f.join(';'))
-    ].join('\n');
-
-    const universalBOM = "\uFEFF";
-    const blob = new Blob([universalBOM + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Reporte_PinchoPan_${semanaKey.replace(/\//g, '-')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Descargar CSV Resumen (Una fila por proveedor por semana)
-  const descargarResumenCSV = (semanaKey) => {
-    const semana = semanas.find(s => s.key === semanaKey);
-    const titular = "Inversiones pincho pan express II C.A.";
-    const subTitular = `Resumen General de Cuentas por Pagar - Semana: ${semana.inicio} al ${semana.fin}`;
-
-    const headers = ['Proveedor', 'RIF', 'Encargado', 'Deuda Total', 'Total Pagado', 'Saldo Pendiente'];
-
-    const filas = proveedores.map(p => {
-      const totales = obtenerTotalesSemana(p, semanaKey);
-      const formatearNum = (num) => num.toFixed(2).replace('.', ',');
-
-      return [
-        `"${p.nombre}"`,
-        `"${p.rif || '-'}"`,
-        `"${p.encargado || '-'}"`,
-        formatearNum(totales.monto),
-        formatearNum(totales.pagado),
-        formatearNum(totales.saldo)
-      ];
-    });
-
-    const csvContent = [
-      titular,
-      subTitular,
-      '',
-      headers.join(';'),
-      ...filas.map(f => f.join(';'))
-    ].join('\n');
-
-    const universalBOM = "\uFEFF";
-    const blob = new Blob([universalBOM + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Resumen_Cuentas_${semanaKey.replace(/\//g, '-')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
-  // Descargar Reporte Anual (Consolidado de todas las semanas)
-  const descargarReporteAnualCSV = () => {
-    const titular = "Inversiones pincho pan express II C.A.";
-    const subTitular = "Reporte Anual Consolidado - Periodo 2025";
-
-    const headers = ['Proveedor', 'RIF', 'Encargado', 'Deuda Total Anual', 'Total Pagado Anual', 'Saldo Anual Pendiente'];
-
-    const filas = proveedores.map(p => {
+  // Descargar Reporte Anual (Excel)
+  const descargarReporteAnualExcel = () => {
+    // Hoja 1: Resumen
+    const headersResumen = ['Proveedor', 'RIF', 'Encargado', 'Deuda Total Anual', 'Total Pagado Anual', 'Saldo Anual Pendiente'];
+    const filasResumen = proveedores.map(p => {
       let deudaAnual = 0;
       let pagadoAnual = 0;
-      
-      // Sumar todas las semanas registradas
       semanas.forEach(semana => {
         const totales = obtenerTotalesSemana(p, semana.key);
         deudaAnual += totales.monto;
         pagadoAnual += totales.pagado;
       });
-
-      const formatearNum = (num) => num.toFixed(2).replace('.', ',');
-
-      return [
-        `"${p.nombre}"`,
-        `"${p.rif || '-'}"`,
-        `"${p.encargado || '-'}"`,
-        formatearNum(deudaAnual),
-        formatearNum(pagadoAnual),
-        formatearNum(Math.max(0, deudaAnual - pagadoAnual))
-      ];
+      return {
+        'Proveedor': p.nombre,
+        'RIF': p.rif || '-',
+        'Encargado': p.encargado || '-',
+        'Deuda Total Anual': deudaAnual,
+        'Total Pagado Anual': pagadoAnual,
+        'Saldo Anual Pendiente': Math.max(0, deudaAnual - pagadoAnual)
+      };
     });
 
-    const csvContent = [
-      titular,
-      subTitular,
-      '',
-      headers.join(';'),
-      ...filas.map(f => f.join(';'))
-    ].join('\n');
+    // Hoja 2: Histórico (por proveedor)
+    const headersHistorico = [
+      'Proveedor', 'Fecha', 'Tipo de Documento', 'Nro Referencia',
+      'Monto Base', 'IVA 16%', 'IVA 8%', 'Ret. Municipal', 'Ret. IVA', '% Ret. IVA', 'Total Bruto',
+      'Pagado', 'Saldo Acumulado', 'Referencia/Pago', 'Observaciones'
+    ];
+    const filasHistorico = [];
 
-    const universalBOM = "\uFEFF";
-    const blob = new Blob([universalBOM + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', 'Reporte_Anual_Consolidado_2025.csv');
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Ordenar por proveedor
+    const proveedoresOrdenados = [...proveedores].sort((a, b) => a.nombre.localeCompare(b.nombre));
+
+    proveedoresOrdenados.forEach(p => {
+      let todasLasTransacciones = [];
+      semanas.forEach(semana => {
+        const registroSemana = p.registroDiario?.[semana.key] || {};
+        const [d, m, a] = semana.inicio.split('/').map(Number);
+        [0, 1, 2, 3, 4, 5, 6].forEach(i => {
+          const fechaBase = new Date(a, m - 1, d);
+          fechaBase.setDate(fechaBase.getDate() + i);
+          const dk = fechaBase.toISOString().split('T')[0];
+
+          const diaData = registroSemana[dk];
+          if (diaData) {
+            const registrosDia = Array.isArray(diaData) ? diaData : [diaData];
+            registrosDia.forEach(dData => {
+              if (((parseFloat(dData.monto) || 0) !== 0 || (parseFloat(dData.pagado) || 0) !== 0)) {
+                todasLasTransacciones.push({ ...dData, dk });
+              }
+            });
+          }
+        });
+      });
+
+      todasLasTransacciones.sort((a, b) => {
+        const fechaA = new Date((a.fechaOperacion || a.dk) + 'T00:00:00');
+        const fechaB = new Date((b.fechaOperacion || b.dk) + 'T00:00:00');
+        return fechaA - fechaB;
+      });
+
+      let saldoAcumulado = 0;
+      todasLasTransacciones.forEach(dData => {
+        const base = parseFloat(dData.monto) || 0;
+        const sign = base < 0 ? -1 : 1;
+        const absBase = Math.abs(base);
+
+        let absIva16 = 0, absIva8 = 0;
+        if (dData.tasaIva === 'Manual') {
+          absIva16 = Math.abs(parseFloat(dData.ivaManual) || 0);
+        } else {
+          absIva16 = Math.abs(parseFloat(dData.iva16) || 0);
+          absIva8 = Math.abs(parseFloat(dData.iva8) || 0);
+        }
+
+        const absRet = Math.abs(parseFloat(dData.retencion) || 0);
+        const absRetIva = Math.abs(parseFloat(dData.retencionIva) || 0);
+        const pagado = parseFloat(dData.pagado) || 0;
+
+        const totalNeto = ((absBase + absIva16 + absIva8) - absRet - absRetIva) * sign;
+        saldoAcumulado = saldoAcumulado + totalNeto - pagado;
+        const saldoMostrar = Math.max(0, saldoAcumulado);
+
+        filasHistorico.push({
+          'Proveedor': p.nombre,
+          'Fecha': dData.fechaOperacion || dData.dk,
+          'Tipo de Documento': dData.tipoDocumento || 'Factura',
+          'Nro Referencia': dData.numeroFactura || '-',
+          'Monto Base': base,
+          'IVA 16%': absIva16 * sign,
+          'IVA 8%': absIva8 * sign,
+          'Ret. Municipal': absRet * sign,
+          'Ret. IVA': absRetIva * sign,
+          '% Ret. IVA': dData.aplicaRetencionIva === false ? 'No' : (dData.porcentajeRetencionIva || '75') + '%',
+          'Total Bruto': totalNeto,
+          'Pagado': pagado,
+          'Saldo Acumulado': saldoMostrar,
+          'Referencia/Pago': dData.referencia || '-',
+          'Observaciones': dData.observaciones || ''
+        });
+      });
+    });
+
+    const wb = XLSX.utils.book_new();
+    const wsResumen = XLSX.utils.json_to_sheet(filasResumen, { header: headersResumen });
+    const wsHistorico = XLSX.utils.json_to_sheet(filasHistorico, { header: headersHistorico });
+
+    XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
+    XLSX.utils.book_append_sheet(wb, wsHistorico, "Histórico");
+
+    XLSX.writeFile(wb, "Reporte_Anual_Consolidado_2025.xlsx");
   };
 
   // Descargar Reporte Histórico por Proveedor (Todas sus semanas y transacciones)
@@ -427,16 +362,16 @@ const CuentasPorPagar = () => {
     semanas.forEach(semana => {
       const registroSemana = p.registroDiario?.[semana.key] || {};
       const [d, m, a] = semana.inicio.split('/').map(Number);
-      
+
       [0, 1, 2, 3, 4, 5, 6].forEach(i => {
         const fechaBase = new Date(a, m - 1, d);
         fechaBase.setDate(fechaBase.getDate() + i);
         const dk = fechaBase.toISOString().split('T')[0];
-        
+
         const diaData = registroSemana[dk];
         if (diaData) {
           const registrosDia = Array.isArray(diaData) ? diaData : [diaData];
-          
+
           registrosDia.forEach(dData => {
             if (((parseFloat(dData.monto) || 0) !== 0 || (parseFloat(dData.pagado) || 0) !== 0)) {
               todasLasTransacciones.push({ ...dData, dk });
@@ -460,21 +395,21 @@ const CuentasPorPagar = () => {
       const base = parseFloat(dData.monto) || 0;
       const sign = base < 0 ? -1 : 1;
       const absBase = Math.abs(base);
-      
+
       let absIva16 = 0, absIva8 = 0;
       if (dData.tasaIva === 'Manual') {
-         absIva16 = Math.abs(parseFloat(dData.ivaManual) || 0);
+        absIva16 = Math.abs(parseFloat(dData.ivaManual) || 0);
       } else {
-         absIva16 = Math.abs(parseFloat(dData.iva16) || 0);
-         absIva8 = Math.abs(parseFloat(dData.iva8) || 0);
+        absIva16 = Math.abs(parseFloat(dData.iva16) || 0);
+        absIva8 = Math.abs(parseFloat(dData.iva8) || 0);
       }
-      
+
       const absRet = Math.abs(parseFloat(dData.retencion) || 0);
       const absRetIva = Math.abs(parseFloat(dData.retencionIva) || 0);
       const pagado = parseFloat(dData.pagado) || 0;
-      
+
       const totalNeto = ((absBase + absIva16 + absIva8) - absRet - absRetIva) * sign;
-      
+
       saldoAcumulado = saldoAcumulado + totalNeto - pagado;
       const saldoMostrar = Math.max(0, saldoAcumulado);
 
@@ -534,14 +469,14 @@ const CuentasPorPagar = () => {
     if (window.confirm('¿Está seguro de que desea eliminar esta semana permanentemente? Se borrará de la base de datos.')) {
       const nuevasSemanas = semanas.filter(s => s.key !== semanaKey);
       setSemanas(nuevasSemanas);
-      
+
       // Actualizar todos los proveedores localmente
       const proveedoresActualizados = proveedores.map(proveedor => ({
         ...proveedor,
         deudas: proveedor.deudas.filter(d => d.semana !== semanaKey)
       }));
       setProveedores(proveedoresActualizados);
-      
+
       try {
         // Actualizar semanas persistentes en Firebase
         await updateDoc(doc(db, 'configuracion', 'semanas_por_pagar'), {
@@ -565,20 +500,20 @@ const CuentasPorPagar = () => {
     try {
       const proveedor = proveedores.find(p => p.id === proveedorId);
       const deuda = proveedor.deudas.find(d => d.semana === semanaKey);
-      
-      const deudasActualizadas = proveedor.deudas.map(deuda => 
-        deuda.semana === semanaKey ? { 
-          ...deuda, 
+
+      const deudasActualizadas = proveedor.deudas.map(deuda =>
+        deuda.semana === semanaKey ? {
+          ...deuda,
           pagadoCompleto,
           pagado: pagadoCompleto ? (parseFloat(deuda.monto) || 0) : deuda.pagado
         } : deuda
       );
-      
+
       await updateDoc(doc(db, 'por_pagar', proveedorId), {
         deudas: deudasActualizadas
       });
-      
-      setProveedores(proveedores.map(p => 
+
+      setProveedores(proveedores.map(p =>
         p.id === proveedorId ? { ...p, deudas: deudasActualizadas } : p
       ));
     } catch (error) {
@@ -591,23 +526,23 @@ const CuentasPorPagar = () => {
     try {
       const proveedor = proveedores.find(p => p.id === proveedorId);
       const montoNumerico = monto === '' ? '' : parseFloat(monto) || 0;
-      
-      const deudasActualizadas = proveedor.deudas.map(deuda => 
-        deuda.semana === semanaKey ? { 
-          ...deuda, 
+
+      const deudasActualizadas = proveedor.deudas.map(deuda =>
+        deuda.semana === semanaKey ? {
+          ...deuda,
           monto: montoNumerico,
           pagado: deuda.pagadoCompleto ? montoNumerico : deuda.pagado
         } : deuda
       );
-      
+
       await updateDoc(doc(db, 'por_pagar', proveedorId), {
         deudas: deudasActualizadas
       });
-      
-      setProveedores(proveedores.map(p => 
+
+      setProveedores(proveedores.map(p =>
         p.id === proveedorId ? { ...p, deudas: deudasActualizadas } : p
       ));
-      
+
       setEditandoDeuda(null);
     } catch (error) {
       console.error('Error actualizando deuda:', error);
@@ -621,23 +556,23 @@ const CuentasPorPagar = () => {
       const pagoNumerico = pago === '' ? 0 : parseFloat(pago) || 0;
       const deuda = proveedor.deudas.find(d => d.semana === semanaKey);
       const montoDeuda = parseFloat(deuda.monto) || 0;
-      
-      const deudasActualizadas = proveedor.deudas.map(deuda => 
-        deuda.semana === semanaKey ? { 
-          ...deuda, 
+
+      const deudasActualizadas = proveedor.deudas.map(deuda =>
+        deuda.semana === semanaKey ? {
+          ...deuda,
           pagado: pagoNumerico,
           pagadoCompleto: pagoNumerico >= montoDeuda
         } : deuda
       );
-      
+
       await updateDoc(doc(db, 'por_pagar', proveedorId), {
         deudas: deudasActualizadas
       });
-      
-      setProveedores(proveedores.map(p => 
+
+      setProveedores(proveedores.map(p =>
         p.id === proveedorId ? { ...p, deudas: deudasActualizadas } : p
       ));
-      
+
       setEditandoPago(null);
     } catch (error) {
       console.error('Error actualizando pago:', error);
@@ -650,7 +585,7 @@ const CuentasPorPagar = () => {
       alert('Por favor ingrese ambas fechas');
       return;
     }
-    
+
     // Convertir de formato nativo date (YYYY-MM-DD) a DD/MM/YYYY
     const formatearFecha = (fechaInput) => {
       if (fechaInput.includes('-')) {
@@ -662,31 +597,31 @@ const CuentasPorPagar = () => {
 
     const inicioFormateado = formatearFecha(nuevaSemana.inicio);
     const finFormateado = formatearFecha(nuevaSemana.fin);
-    
+
     const regexFecha = /^\d{2}\/\d{2}\/\d{4}$/;
     if (!regexFecha.test(inicioFormateado) || !regexFecha.test(finFormateado)) {
       alert('Formato de fecha inválido. Use el selector de calendario');
       return;
     }
-    
+
     const nuevaSemanaKey = `${inicioFormateado}-${finFormateado}`;
-    
+
     if (semanas.some(s => s.key === nuevaSemanaKey)) {
       alert('Esta semana ya existe');
       return;
     }
-    
+
     const semana = {
       inicio: inicioFormateado,
       fin: finFormateado,
       key: nuevaSemanaKey,
       creadaManualmente: true
     };
-    
+
     const nuevaListaSemanas = ordenarSemanas([...semanas, semana]);
-    
+
     setSemanas(nuevaListaSemanas);
-    
+
     // Actualizar todos los proveedores con la nueva semana
     const proveedoresActualizados = proveedores.map(proveedor => ({
       ...proveedor,
@@ -695,9 +630,9 @@ const CuentasPorPagar = () => {
         { semana: semana.key, monto: '', pagado: 0, pagadoCompleto: false }
       ]
     }));
-    
+
     setProveedores(proveedoresActualizados);
-    
+
     // Actualizar en Firebase
     try {
       // Registrar nueva semana en la BD global
@@ -713,7 +648,7 @@ const CuentasPorPagar = () => {
     } catch (error) {
       console.error('Error sincronizando adición de semana:', error);
     }
-    
+
     setNuevaSemana({ inicio: '', fin: '' });
     setMostrarModal(false);
   };
@@ -721,11 +656,11 @@ const CuentasPorPagar = () => {
   // Filtrar proveedores
   const proveedoresFiltrados = proveedores.filter(proveedor => {
     const coincideNombre = proveedor.nombre.toLowerCase().includes(filtro.toLowerCase());
-    
+
     // Filtro por semana específica
     if (semanaFiltro) {
-      const tieneDeudaEnSemana = proveedor.deudas?.some(deuda => deuda.semana === semanaFiltro) || 
-                                !!proveedor.registroDiario?.[semanaFiltro];
+      const tieneDeudaEnSemana = proveedor.deudas?.some(deuda => deuda.semana === semanaFiltro) ||
+        !!proveedor.registroDiario?.[semanaFiltro];
       if (!tieneDeudaEnSemana) return false;
     }
 
@@ -749,20 +684,20 @@ const CuentasPorPagar = () => {
       if (proveedor.registroDiario) {
         Object.values(proveedor.registroDiario).forEach(diaRecords => {
           if (diaRecords[diaFiltro]) {
-             const diaData = diaRecords[diaFiltro];
-             const registrosDia = Array.isArray(diaData) ? diaData : [diaData];
-             
-             registrosDia.forEach(d => {
-               if ((parseFloat(d.monto) || 0) !== 0 || (parseFloat(d.pagado) || 0) !== 0) {
-                 tieneRegistroEseDia = true;
-               }
-             });
+            const diaData = diaRecords[diaFiltro];
+            const registrosDia = Array.isArray(diaData) ? diaData : [diaData];
+
+            registrosDia.forEach(d => {
+              if ((parseFloat(d.monto) || 0) !== 0 || (parseFloat(d.pagado) || 0) !== 0) {
+                tieneRegistroEseDia = true;
+              }
+            });
           }
         });
       }
       if (!tieneRegistroEseDia) return false;
     }
-    
+
     return coincideNombre;
   });
 
@@ -784,7 +719,7 @@ const CuentasPorPagar = () => {
       const fInicio = new Date(a, m - 1, d);
       const fFin = new Date(fInicio);
       fFin.setDate(fFin.getDate() + 6);
-      
+
       const fDia = new Date(diaFiltro + 'T00:00:00'); // Evitar problemas de zona horaria
       if (fDia < fInicio || fDia > fFin) return false;
     }
@@ -902,26 +837,27 @@ const CuentasPorPagar = () => {
 
   if (mostrarModalDetalle && proveedorSeleccionado) {
     return (
-      <FichaProveedor 
+      <FichaProveedor
         proveedor={proveedorSeleccionado}
         semanas={semanas}
         semanaAbiertaInicial={semanaAbierta}
         onClose={() => setMostrarModalDetalle(false)}
         onSave={guardarDetalleProveedor}
         puedeEditar={puedeEditar}
+        puedeEliminar={puedeEliminar}
       />
     );
   }
 
   return (
     <div className="cuentas-por-pagar">
-    <br />
+      <br />
       {/* Header minimalista que complementa el menú principal */}
       <div className="page-header">
         <h1>Cuentas por Pagar</h1>
         <p>Gestión de deudas a proveedores por semana - 2025</p>
       </div>
-      
+
       {/* Controles */}
       <div className="controles">
         <div className="filtros">
@@ -934,7 +870,7 @@ const CuentasPorPagar = () => {
               onChange={(e) => setFiltro(e.target.value)}
             />
           </div>
-          
+
           <div className="filtro-select">
             <span className="icon">📅</span>
             <select
@@ -974,9 +910,9 @@ const CuentasPorPagar = () => {
 
           <div className="filtro-date">
             <label className="d-label">Ver Día:</label>
-            <input 
-              type="date" 
-              value={diaFiltro} 
+            <input
+              type="date"
+              value={diaFiltro}
               onChange={(e) => setDiaFiltro(e.target.value)}
             />
           </div>
@@ -985,7 +921,7 @@ const CuentasPorPagar = () => {
             🔄 Reiniciar
           </button>
         </div>
-        
+
         <div className="acciones">
           {puedeEditar && (
             <>
@@ -994,24 +930,24 @@ const CuentasPorPagar = () => {
                   type="text"
                   placeholder="Nombre del proveedor"
                   value={nuevoProveedor.nombre}
-                  onChange={(e) => setNuevoProveedor({...nuevoProveedor, nombre: e.target.value})}
+                  onChange={(e) => setNuevoProveedor({ ...nuevoProveedor, nombre: e.target.value })}
                 />
                 <button className="btn btn-primary" onClick={agregarProveedor}>
                   Agregar Proveedor
                 </button>
               </div>
-              
+
               <button className="btn btn-secondary" onClick={() => setMostrarModal(true)}>
                 Agregar Semana
               </button>
             </>
           )}
-          <button className="btn-reporte-anual" onClick={descargarReporteAnualCSV}>
-            📥 Reporte Anual
+          <button className="btn-reporte-anual" onClick={descargarReporteAnualExcel}>
+            📥 Reporte Anual Excel
           </button>
         </div>
       </div>
-      
+
       {/* Modal para agregar semana */}
       {mostrarModal && (
         <div className="modal">
@@ -1067,7 +1003,7 @@ const CuentasPorPagar = () => {
                 <input
                   type="date"
                   value={nuevaSemana.inicio}
-                  onChange={(e) => setNuevaSemana({...nuevaSemana, inicio: e.target.value})}
+                  onChange={(e) => setNuevaSemana({ ...nuevaSemana, inicio: e.target.value })}
                 />
               </div>
               <div className="input-group">
@@ -1075,7 +1011,7 @@ const CuentasPorPagar = () => {
                 <input
                   type="date"
                   value={nuevaSemana.fin}
-                  onChange={(e) => setNuevaSemana({...nuevaSemana, fin: e.target.value})}
+                  onChange={(e) => setNuevaSemana({ ...nuevaSemana, fin: e.target.value })}
                 />
               </div>
             </div>
@@ -1090,7 +1026,7 @@ const CuentasPorPagar = () => {
           </div>
         </div>
       )}
-      
+
       {/* Resumen */}
       <div className="resumen">
         <div className="resumen-item">
@@ -1114,7 +1050,7 @@ const CuentasPorPagar = () => {
           <span className="resumen-valor">${calcularSaldoPendienteGeneral().toLocaleString()}</span>
         </div>
       </div>
-      
+
       {/* Tabla de proveedores */}
       <div className="tabla-container">
         <table className="tabla-proveedores">
@@ -1129,22 +1065,8 @@ const CuentasPorPagar = () => {
                     <span>{semana.fin}</span>
                   </div>
                   <div className="semana-acciones">
-                    <button 
-                      className="btn-descargar-csv"
-                      onClick={() => descargarCSV(semana.key)}
-                      title="Descargar Reporte Detallado (Factura por Fila)"
-                    >
-                      📄 Detalle
-                    </button>
-                    <button 
-                      className="btn-descargar-resumen"
-                      onClick={() => descargarResumenCSV(semana.key)}
-                      title="Descargar Resumen General (Monto Total/Pagado)"
-                    >
-                      📊 Resumen
-                    </button>
                     {puedeEliminar && (
-                      <button 
+                      <button
                         className="btn-eliminar-semana"
                         onClick={() => eliminarSemana(semana.key)}
                         title="Eliminar semana"
@@ -1165,7 +1087,7 @@ const CuentasPorPagar = () => {
             {proveedoresFiltrados.length > 0 ? (
               proveedoresFiltrados.map(proveedor => (
                 <tr key={proveedor.id}>
-                  <td 
+                  <td
                     className="proveedor-nombre clickable"
                     onClick={() => abrirDetalleProveedor(proveedor)}
                   >
@@ -1177,14 +1099,14 @@ const CuentasPorPagar = () => {
                   {semanasAMostrar.map(semana => {
                     const totales = obtenerTotalesSemana(proveedor, semana.key);
                     const deudaMeta = proveedor.deudas?.find(d => d.semana === semana.key) || {};
-                    
+
                     return (
                       <td key={semana.key} className={deudaMeta.pagadoCompleto || (totales.monto > 0 && totales.saldo === 0) ? 'deuda pagado' : 'deuda'}>
                         <div className="contenido-deuda">
                           <div className="monto-summary" onClick={() => abrirDetalleProveedor(proveedor, semana.key)}>
                             <div className="summary-row">
                               <span className="label">Total Deuda:</span>
-                               <span className="value">${totales.monto.toLocaleString()}</span>
+                              <span className="value">${totales.monto.toLocaleString()}</span>
                             </div>
                             <div className="summary-row">
                               <span className="label">Saldo:</span>
@@ -1193,7 +1115,7 @@ const CuentasPorPagar = () => {
                               </span>
                             </div>
                           </div>
-                          
+
                           {puedeEditar && (
                             <label className="checkbox-pagado">
                               <input
@@ -1209,39 +1131,39 @@ const CuentasPorPagar = () => {
                       </td>
                     );
                   })}
-                    <td className="total-proveedor">
-                      <div className="total-monto">
-                        ${calcularTotalProveedor(proveedor).toLocaleString()}
-                      </div>
-                    </td>
-                    <td className="total-pagado">
-                      <div className="total-monto">
-                        ${calcularTotalPagado(proveedor).toLocaleString()}
-                      </div>
-                    </td>
-                    <td className="saldo-pendiente">
-                      <div className="total-monto">
-                        ${calcularSaldoPendienteProveedor(proveedor).toLocaleString()}
-                      </div>
-                    </td>
-                    <td className="acciones">
-                      <button 
-                        className="btn btn-descargar-individual"
-                        onClick={() => descargarReporteProveedorCSV(proveedor)}
-                        title="Descargar Estado de Cuenta Completo"
+                  <td className="total-proveedor">
+                    <div className="total-monto">
+                      ${calcularTotalProveedor(proveedor).toLocaleString()}
+                    </div>
+                  </td>
+                  <td className="total-pagado">
+                    <div className="total-monto">
+                      ${calcularTotalPagado(proveedor).toLocaleString()}
+                    </div>
+                  </td>
+                  <td className="saldo-pendiente">
+                    <div className="total-monto">
+                      ${calcularSaldoPendienteProveedor(proveedor).toLocaleString()}
+                    </div>
+                  </td>
+                  <td className="acciones">
+                    <button
+                      className="btn btn-descargar-individual"
+                      onClick={() => descargarReporteProveedorCSV(proveedor)}
+                      title="Descargar Estado de Cuenta Completo"
+                    >
+                      📥 Reporte
+                    </button>
+                    {puedeEliminar && (
+                      <button
+                        className="btn btn-eliminar"
+                        onClick={() => eliminarProveedor(proveedor.id)}
                       >
-                        📥 Reporte
+                        Eliminar
                       </button>
-                      {puedeEliminar && (
-                        <button 
-                          className="btn btn-eliminar"
-                          onClick={() => eliminarProveedor(proveedor.id)}
-                        >
-                          Eliminar
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+                    )}
+                  </td>
+                </tr>
               ))
             ) : (
               <tr>
@@ -1251,7 +1173,7 @@ const CuentasPorPagar = () => {
               </tr>
             )}
           </tbody>
-          
+
           {/* Footer con totales por semana */}
           <tfoot className="tabla-footer">
             <tr>
@@ -1260,7 +1182,7 @@ const CuentasPorPagar = () => {
                 const totalSemana = proveedoresFiltrados.reduce((sum, p) => {
                   return sum + obtenerTotalesSemana(p, semana.key).saldo;
                 }, 0);
-                
+
                 return (
                   <td key={semana.key} className="footer-monto">
                     ${totalSemana.toLocaleString()}

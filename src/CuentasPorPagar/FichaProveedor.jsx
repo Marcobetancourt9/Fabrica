@@ -22,7 +22,8 @@ const FichaProveedor = ({
   semanaAbiertaInicial, 
   onClose, 
   onSave,
-  puedeEditar = true
+  puedeEditar = true,
+  puedeEliminar = false
 }) => {
   const [datosDetalle, setDatosDetalle] = useState({
     rif: proveedor.rif || '',
@@ -364,7 +365,7 @@ const FichaProveedor = ({
                               <h4>{tipoDoc}</h4>
                               <span className={`doc-effect ${esResta ? 'resta' : 'suma'}`}>{esResta ? 'Resta Deuda' : 'Suma Deuda'}</span>
                             </div>
-                            {puedeEditar && (
+                            {puedeEliminar && (
                               <button className="btn-delete-doc" onClick={() => eliminarDocumento(docId)}>🗑️ Eliminar</button>
                             )}
                           </div>
@@ -372,7 +373,7 @@ const FichaProveedor = ({
                           <div className="document-card-body">
                             <div className={`form-grid-${tipoDoc === 'Pago' ? '2' : '3'}`}>
                               <div className="f-field">
-                                <label>{tipoDoc === 'Pago' ? 'Número de Referencia' : 'Número de Control'}</label>
+                                <label>{tipoDoc === 'Pago' ? 'Banco' : 'Número de Control'}</label>
                                 <input type="text" value={dData.numeroFactura || ''} onChange={(e) => manejarCambioDoc(docId, 'numeroFactura', e.target.value)} placeholder={tipoDoc === 'Pago' ? 'Efectivo, Transferencia...' : '0001'} disabled={!puedeEditar} />
                               </div>
                               <div className="f-field">
@@ -549,8 +550,8 @@ const FichaProveedor = ({
                             </div>
 
                             <div className="f-field">
-                              <label>Observaciones</label>
-                              <textarea value={dData.observaciones || ''} onChange={(e) => manejarCambioDoc(docId, 'observaciones', e.target.value)} placeholder="Detalles adicionales sobre esta transacción..." className="observaciones-textarea" disabled={!puedeEditar} />
+                              <label>{tipoDoc === 'Pago' ? 'Número de Referencia' : 'Observaciones'}</label>
+                              <textarea value={dData.observaciones || ''} onChange={(e) => manejarCambioDoc(docId, 'observaciones', e.target.value)} placeholder={tipoDoc === 'Pago' ? 'Número de referencia...' : 'Detalles adicionales sobre esta transacción...'} className="observaciones-textarea" disabled={!puedeEditar} />
                             </div>
                           </div>
                         </div>
