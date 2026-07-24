@@ -1,0 +1,35 @@
+name: Weekly Firebase Backup
+
+on:
+  schedule:
+    # Ejecuta a la medianoche todos los domingos
+    - cron: '0 0 * * 0'
+  workflow_dispatch: # Permite ejecución manual desde la pestaña de Actions
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Dependencies
+        run: npm install
+
+      - name: Run Backup Script
+        env:
+          # El secret debe ser configurado en Settings > Secrets and variables > Actions
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: npm run backup
+
+      - name: Upload Backup Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: firebase-backup-${{ github.run_id }}
+          path: backup-*.json
+          retention-days: 90
