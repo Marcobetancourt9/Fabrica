@@ -235,6 +235,35 @@
   font-weight: bold;
 }
 
+/* Clickable provider name for CSV download */
+.nombre-descargable {
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: all 0.25s ease;
+  position: relative;
+}
+
+.nombre-descargable:hover {
+  background: rgba(59, 130, 246, 0.15);
+  transform: translateX(2px);
+}
+
+.nombre-descargable:active {
+  transform: scale(0.98);
+}
+
+.download-icon {
+  opacity: 0;
+  font-size: 14px;
+  transition: opacity 0.25s ease;
+  margin-left: 6px;
+}
+
+.nombre-descargable:hover .download-icon {
+  opacity: 1;
+}
+
 /* Estilos para montos */
 .monto {
   font-weight: 600;
