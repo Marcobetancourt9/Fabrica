@@ -3,6 +3,8 @@ import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, setDoc, getDoc 
 import { db, auth } from '../../credentials';
 import { InstallAppButton } from '../PWA/InstallAppButton';
 import FichaProveedor from './FichaProveedor';
+import HistorialCuentas from './HistorialCuentas';
+import { registrarHistorial } from '../utils/historial';
 import './CuentasPorPagar.css';
 
 const ordenarSemanas = (listaSemanas) => {
@@ -37,6 +39,7 @@ const CuentasPorPagar = () => {
   const [mostrarModalDetalle, setMostrarModalDetalle] = useState(false);
   const [semanaAbierta, setSemanaAbierta] = useState(null);
   const [mostrarDropdownSemanas, setMostrarDropdownSemanas] = useState(false);
+  const [mostrarHistorial, setMostrarHistorial] = useState(false);
 
   const userEmail = auth?.currentUser?.email;
   const puedeEliminar = userEmail === 'marco.betancourt@correo.unimet.edu.ve';
@@ -195,6 +198,7 @@ const CuentasPorPagar = () => {
       const docRef = await addDoc(collection(db, 'por_pagar'), proveedorConDeudas);
       setProveedores([...proveedores, { id: docRef.id, ...proveedorConDeudas }]);
       setNuevoProveedor({ nombre: '', deudas: [] });
+      await registrarHistorial('CREACIÓN', 'Cuentas por Pagar', docRef.id, { nombre: nuevoProveedor.nombre });
     } catch (error) {
       console.error('Error agregando proveedor:', error);
     }
@@ -225,6 +229,7 @@ const CuentasPorPagar = () => {
 
       setMostrarModalDetalle(false);
       setProveedorSeleccionado(null);
+      await registrarHistorial('EDICIÓN', 'Cuentas por Pagar', proveedorSeleccionado.id, { accion: 'Detalle/Ficha guardada' });
       alert('Cambios guardados exitosamente en la base de datos.');
     } catch (error) {
       console.error('Error al guardar en Firebase:', error);
@@ -521,8 +526,10 @@ const CuentasPorPagar = () => {
   const eliminarProveedor = async (id) => {
     if (window.confirm('¿Está seguro de que desea eliminar este proveedor?')) {
       try {
+        const proveedor = proveedores.find(p => p.id === id);
         await deleteDoc(doc(db, 'por_pagar', id));
         setProveedores(proveedores.filter(p => p.id !== id));
+        await registrarHistorial('ELIMINACIÓN', 'Cuentas por Pagar', id, { nombre: proveedor?.nombre });
       } catch (error) {
         console.error('Error eliminando proveedor:', error);
       }
@@ -554,6 +561,7 @@ const CuentasPorPagar = () => {
             deudas: proveedor.deudas
           });
         });
+        await registrarHistorial('ELIMINACIÓN', 'Cuentas por Pagar', 'GLOBAL', { accion: `Semana ${semanaKey} eliminada` });
       } catch (error) {
         console.error('Error sincronizando eliminación de semana:', error);
       }
@@ -581,6 +589,11 @@ const CuentasPorPagar = () => {
       setProveedores(proveedores.map(p => 
         p.id === proveedorId ? { ...p, deudas: deudasActualizadas } : p
       ));
+      
+      await registrarHistorial('EDICIÓN', 'Cuentas por Pagar', proveedorId, { 
+        semana: semanaKey, 
+        pagoCompleto: pagadoCompleto 
+      });
     } catch (error) {
       console.error('Error actualizando pago completo:', error);
     }
@@ -609,6 +622,10 @@ const CuentasPorPagar = () => {
       ));
       
       setEditandoDeuda(null);
+      await registrarHistorial('EDICIÓN', 'Cuentas por Pagar', proveedorId, { 
+        semana: semanaKey, 
+        nuevaDeuda: montoNumerico 
+      });
     } catch (error) {
       console.error('Error actualizando deuda:', error);
     }
@@ -639,6 +656,10 @@ const CuentasPorPagar = () => {
       ));
       
       setEditandoPago(null);
+      await registrarHistorial('EDICIÓN', 'Cuentas por Pagar', proveedorId, { 
+        semana: semanaKey, 
+        nuevoPago: pagoNumerico 
+      });
     } catch (error) {
       console.error('Error actualizando pago:', error);
     }
@@ -710,6 +731,7 @@ const CuentasPorPagar = () => {
           deudas: proveedor.deudas
         });
       });
+      await registrarHistorial('CREACIÓN', 'Cuentas por Pagar', 'GLOBAL', { accion: `Semana ${nuevaSemanaKey} agregada` });
     } catch (error) {
       console.error('Error sincronizando adición de semana:', error);
     }
@@ -1009,6 +1031,9 @@ const CuentasPorPagar = () => {
           <button className="btn-reporte-anual" onClick={descargarReporteAnualCSV}>
             📥 Reporte Anual
           </button>
+          <button className="btn btn-secondary" onClick={() => setMostrarHistorial(true)} style={{marginLeft: '10px', backgroundColor: '#6c757d', color: 'white', borderColor: '#6c757d'}}>
+            🕒 Ver Historial
+          </button>
         </div>
       </div>
       
@@ -1281,6 +1306,11 @@ const CuentasPorPagar = () => {
           </tfoot>
         </table>
       </div>
+      
+      {/* Modal para mostrar historial */}
+      {mostrarHistorial && (
+        <HistorialCuentas onClose={() => setMostrarHistorial(false)} />
+      )}
     </div>
   );
 };
