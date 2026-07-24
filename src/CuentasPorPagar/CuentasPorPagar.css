@@ -283,6 +283,8 @@
   min-width: 180px;
   border: 1px solid rgba(96, 165, 250, 0.15);
   transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  container-type: inline-size;
+  container-name: resumen-card;
 }
 
 .resumen-item:hover {
@@ -315,10 +317,13 @@
 }
 
 .resumen-valor {
-  font-size: 2rem;
+  font-size: clamp(1.2rem, 12cqw, 2.2rem);
   font-weight: 800;
   color: #ffffff;
   font-family: 'Inter', monospace;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.1;
 }
 
 .resumen-item.total .resumen-valor {
