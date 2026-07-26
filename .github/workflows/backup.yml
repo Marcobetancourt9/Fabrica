@@ -2,8 +2,8 @@ name: Weekly Firebase Backup
 
 on:
   schedule:
-    # Ejecuta a la medianoche todos los domingos
-    - cron: '0 9 * * 1'
+    # Ejecuta a las 5:00 pm todos los viernes
+    - cron: '0 17 * * 5'
   workflow_dispatch: # Permite ejecución manual desde la pestaña de Actions
 
 jobs:
