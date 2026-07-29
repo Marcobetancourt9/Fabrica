@@ -877,7 +877,7 @@ const CuentasPorPagar = () => {
       {/* Header minimalista que complementa el menú principal */}
       <div className="page-header">
         <h1>Cuentas por Pagar</h1>
-        <p>Gestión de deudas a proveedores por semana - 2025</p>
+        <p>Gestión de deudas a proveedores por semana - 2026</p>
       </div>
 
       {/* Controles */}
