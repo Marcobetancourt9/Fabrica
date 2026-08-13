@@ -595,3 +595,51 @@ tr:hover {
 .shadow { box-shadow: var(--shadow-md); }
 .shadow-lg { box-shadow: var(--shadow-lg); }
 .shadow-none { box-shadow: none; }
+
+/* Connection Banner Styles */
+.connection-banner {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 24px;
+  border-radius: 30px;
+  font-weight: 500;
+  font-size: 0.95rem;
+  letter-spacing: 0.3px;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: slideDown 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+}
+
+.connection-banner.offline {
+  background: rgba(239, 68, 68, 0.85); /* Red 500 */
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.connection-banner.online {
+  background: rgba(16, 185, 129, 0.85); /* Emerald 500 */
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+.connection-banner i {
+  font-size: 1.1rem;
+}
+
+@keyframes slideDown {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -30px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
