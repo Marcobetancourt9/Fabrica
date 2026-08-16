@@ -424,6 +424,16 @@
   min-width: 120px;
 }
 
+.acciones-tabla {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 100%;
+  padding: 12px;
+}
+
 .proveedor-nombre {
   font-weight: 600;
   text-align: left;

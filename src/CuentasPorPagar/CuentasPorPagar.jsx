@@ -1171,7 +1171,7 @@ const CuentasPorPagar = () => {
                       ${calcularSaldoPendienteProveedor(proveedor).toLocaleString()}
                     </div>
                   </td>
-                  <td className="acciones">
+                  <td className="acciones-tabla">
                     <button
                       className="btn btn-descargar-individual"
                       onClick={() => descargarReporteProveedorCSV(proveedor)}
