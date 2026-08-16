@@ -1172,21 +1172,23 @@ const CuentasPorPagar = () => {
                     </div>
                   </td>
                   <td className="acciones-tabla">
-                    <button
-                      className="btn btn-descargar-individual"
-                      onClick={() => descargarReporteProveedorCSV(proveedor)}
-                      title="Descargar Estado de Cuenta Completo"
-                    >
-                      📥 Reporte
-                    </button>
-                    {puedeEliminar && (
+                    <div className="acciones-wrapper">
                       <button
-                        className="btn btn-eliminar"
-                        onClick={() => eliminarProveedor(proveedor.id)}
+                        className="btn btn-descargar-individual"
+                        onClick={() => descargarReporteProveedorCSV(proveedor)}
+                        title="Descargar Estado de Cuenta Completo"
                       >
-                        Eliminar
+                        📥 Reporte
                       </button>
-                    )}
+                      {puedeEliminar && (
+                        <button
+                          className="btn btn-eliminar"
+                          onClick={() => eliminarProveedor(proveedor.id)}
+                        >
+                          Eliminar
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))
