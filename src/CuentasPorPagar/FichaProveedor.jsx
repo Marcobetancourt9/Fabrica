@@ -19,11 +19,12 @@ const TASA_IVA_CONFIG = {
 const FichaProveedor = ({ 
   proveedor, 
   semanas, 
-  semanaAbiertaInicial, 
+  semanaAbiertaInicial,
   onClose, 
   onSave,
   puedeEditar = true,
-  puedeEliminar = false
+  puedeEliminar = false,
+  onDescargarReporte
 }) => {
   const [datosDetalle, setDatosDetalle] = useState({
     rif: proveedor.rif || '',
@@ -225,10 +226,17 @@ const FichaProveedor = ({
     const iva = doc.tasaIva === 'Manual'
                 ? (parseFloat(doc.ivaManual) || 0)
                 : (parseFloat(doc.iva16) || 0) + (parseFloat(doc.iva8) || 0);
-    const neto = ((Math.abs(base) + Math.abs(iva)) 
+    let neto = ((Math.abs(base) + Math.abs(iva)) 
                  - Math.abs(parseFloat(doc.retencion) || 0) - Math.abs(parseFloat(doc.retencionIva) || 0)) * sign;
+    let pagado = parseFloat(doc.pagado) || 0;
+    
+    if (doc.tipoDocumento === 'Pago') {
+      pagado = Math.abs(neto);
+      neto = 0;
+    }
+
     acc.deuda += neto;
-    acc.pagado += parseFloat(doc.pagado) || 0;
+    acc.pagado += pagado;
     return acc;
   }, { deuda: 0, pagado: 0 });
 
@@ -236,10 +244,15 @@ const FichaProveedor = ({
   const totalesHoy = docsHoy.reduce((acc, doc) => {
     const base = parseFloat(doc.monto) || 0;
     const sign = base < 0 ? -1 : 1;
-    const neto = calcularTotalRegistro(doc) * sign;
+    let neto = calcularTotalRegistro(doc) * sign;
+    
+    if (doc.tipoDocumento === 'Pago') {
+      neto = 0;
+    }
+
     acc.neto += neto;
-    if (sign > 0) acc.sumas += neto;
-    else acc.restas += Math.abs(neto);
+    if (sign > 0 && neto !== 0) acc.sumas += neto;
+    else if (sign < 0 && neto !== 0) acc.restas += Math.abs(neto);
     return acc;
   }, { neto: 0, sumas: 0, restas: 0 });
 
@@ -251,9 +264,14 @@ const FichaProveedor = ({
             <span className="subtitle">Gestión de Cuentas por Pagar</span>
             <h1>Ficha de Proveedor: {proveedor.nombre}</h1>
           </div>
-          <button className="btn-close-full" onClick={onClose}>
-            ✕ <span>Cerrar</span>
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+            <button className="btn-close-full" onClick={onClose}>
+              ✕ <span>Cerrar</span>
+            </button>
+            <button className="btn btn-descargar-individual" onClick={onDescargarReporte} style={{ fontSize: '0.8rem', padding: '4px 8px', borderRadius: '4px' }}>
+              📥 Descargar Estado de Cuenta
+            </button>
+          </div>
         </header>
 
         <main className="ficha-content new-layout">
@@ -593,7 +611,12 @@ const FichaProveedor = ({
                       ) : (
                         docsMes.map((doc, idx) => {
                           const esResta = esDocumentoResta(doc.tipoDocumento);
-                          const total = calcularTotalRegistro(doc);
+                          let total = calcularTotalRegistro(doc);
+                          let pagado = parseFloat(doc.pagado || 0);
+                          if (doc.tipoDocumento === 'Pago') {
+                            pagado = total;
+                            total = 0;
+                          }
                           return (
                             <tr key={idx}>
                               <td>{doc.fechaOperacion || doc.diaKey}</td>
@@ -604,9 +627,9 @@ const FichaProveedor = ({
                               </td>
                               <td>{doc.numeroFactura || '-'}</td>
                               <td className={`monto-col ${esResta ? 'neg' : 'pos'}`}>
-                                {esResta ? '-' : '+'}${total.toLocaleString(undefined, {minimumFractionDigits: 2})}
+                                {total === 0 ? '$0.00' : (esResta ? `-$${total.toLocaleString(undefined, {minimumFractionDigits: 2})}` : `+$${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`)}
                               </td>
-                              <td>${parseFloat(doc.pagado || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                              <td>${pagado.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                             </tr>
                           );
                         })

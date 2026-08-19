@@ -142,9 +142,6 @@ const CuentasPorPagar = () => {
       const registrosDia = Array.isArray(dia) ? dia : [dia];
 
       registrosDia.forEach(d => {
-        // En los registros, la retención se almacena en positivo o negativo dependiendo del tipo de doc,
-        // pero la regla general es: Monto + IVA - RetMunicipal - RetIVA
-        // Para simplificar, usaremos los valores absolutos y el signo del monto base.
         const base = parseFloat(d.monto) || 0;
         const sign = base < 0 ? -1 : 1;
         const absBase = Math.abs(base);
@@ -155,13 +152,17 @@ const CuentasPorPagar = () => {
 
         const totalDocumentoNeto = (absBase + absIva16 + absIva8) - absRetencion - absRetencionIva;
 
-        montoTotal += (totalDocumentoNeto * sign);
-        pagadoTotal += parseFloat(d.pagado) || 0;
+        if (d.tipoDocumento === 'Pago') {
+          pagadoTotal += totalDocumentoNeto;
+        } else {
+          montoTotal += (totalDocumentoNeto * sign);
+          pagadoTotal += parseFloat(d.pagado) || 0;
+        }
       });
     });
 
     // Mantener compatibilidad con el sistema anterior si no hay registros diarios aún
-    if (montoTotal === 0) {
+    if (montoTotal === 0 && pagadoTotal === 0) {
       const deudaAntigua = proveedor.deudas?.find(d => d.semana === semanaKey);
       if (deudaAntigua) {
         montoTotal = parseFloat(deudaAntigua.monto) || 0;
@@ -315,9 +316,15 @@ const CuentasPorPagar = () => {
 
         const absRet = Math.abs(parseFloat(dData.retencion) || 0);
         const absRetIva = Math.abs(parseFloat(dData.retencionIva) || 0);
-        const pagado = parseFloat(dData.pagado) || 0;
+        
+        let totalNeto = ((absBase + absIva16 + absIva8) - absRet - absRetIva) * sign;
+        let pagado = parseFloat(dData.pagado) || 0;
 
-        const totalNeto = ((absBase + absIva16 + absIva8) - absRet - absRetIva) * sign;
+        if (dData.tipoDocumento === 'Pago') {
+          pagado = Math.abs(totalNeto);
+          totalNeto = 0;
+        }
+
         saldoAcumulado = saldoAcumulado + totalNeto - pagado;
         const saldoMostrar = Math.max(0, saldoAcumulado);
 
@@ -326,11 +333,11 @@ const CuentasPorPagar = () => {
           'Fecha': dData.fechaOperacion || dData.dk,
           'Tipo de Documento': dData.tipoDocumento || 'Factura',
           'Nro Referencia': dData.numeroFactura || '-',
-          'Monto Base': base,
-          'IVA 16%': absIva16 * sign,
-          'IVA 8%': absIva8 * sign,
-          'Ret. Municipal': absRet * sign,
-          'Ret. IVA': absRetIva * sign,
+          'Monto Base': dData.tipoDocumento === 'Pago' ? 0 : base,
+          'IVA 16%': dData.tipoDocumento === 'Pago' ? 0 : (absIva16 * sign),
+          'IVA 8%': dData.tipoDocumento === 'Pago' ? 0 : (absIva8 * sign),
+          'Ret. Municipal': dData.tipoDocumento === 'Pago' ? 0 : (absRet * sign),
+          'Ret. IVA': dData.tipoDocumento === 'Pago' ? 0 : (absRetIva * sign),
           '% Ret. IVA': dData.aplicaRetencionIva === false ? 'No' : (dData.porcentajeRetencionIva || '75') + '%',
           'Total Bruto': totalNeto,
           'Pagado': pagado,
@@ -345,17 +352,30 @@ const CuentasPorPagar = () => {
     const wsResumen = XLSX.utils.json_to_sheet(filasResumen, { header: headersResumen });
     const wsHistorico = XLSX.utils.json_to_sheet(filasHistorico, { header: headersHistorico });
 
+    // Aplicar formato de contabilidad
+    const formatSheet = (ws) => {
+      if (!ws || !ws['!ref']) return;
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+          const cellStr = XLSX.utils.encode_cell({c: C, r: R});
+          if (ws[cellStr] && typeof ws[cellStr].v === 'number') {
+            ws[cellStr].z = '#,##0.00';
+          }
+        }
+      }
+    };
+    formatSheet(wsResumen);
+    formatSheet(wsHistorico);
+
     XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen");
     XLSX.utils.book_append_sheet(wb, wsHistorico, "Histórico");
 
     XLSX.writeFile(wb, "Reporte_Anual_Consolidado_2025.xlsx");
   };
 
-  // Descargar Reporte Histórico por Proveedor (Todas sus semanas y transacciones)
+  // Descargar Reporte Histórico por Proveedor (Excel con formato contable)
   const descargarReporteProveedorCSV = (p) => {
-    const titular = "Inversiones pincho pan express II C.A.";
-    const subTitular = `Estado de Cuenta Histórico: ${p.nombre} (RIF: ${p.rif || '-'})`;
-
     const headers = [
       'Fecha', 'Tipo de Documento', 'Nro Referencia',
       'Monto Base', 'IVA 16%', 'IVA 8%', 'Ret. Municipal', 'Ret. IVA', '% Ret. IVA', 'Total Bruto',
@@ -386,7 +406,7 @@ const CuentasPorPagar = () => {
       });
     });
 
-    // Ordenar cronológicamente (más antiguo primero)
+    // Ordenar cronológicamente
     todasLasTransacciones.sort((a, b) => {
       const fechaA = new Date((a.fechaOperacion || a.dk) + 'T00:00:00');
       const fechaB = new Date((b.fechaOperacion || b.dk) + 'T00:00:00');
@@ -411,50 +431,54 @@ const CuentasPorPagar = () => {
 
       const absRet = Math.abs(parseFloat(dData.retencion) || 0);
       const absRetIva = Math.abs(parseFloat(dData.retencionIva) || 0);
-      const pagado = parseFloat(dData.pagado) || 0;
+      
+      let totalNeto = ((absBase + absIva16 + absIva8) - absRet - absRetIva) * sign;
+      let pagado = parseFloat(dData.pagado) || 0;
 
-      const totalNeto = ((absBase + absIva16 + absIva8) - absRet - absRetIva) * sign;
+      if (dData.tipoDocumento === 'Pago') {
+        pagado = Math.abs(totalNeto);
+        totalNeto = 0;
+      }
 
       saldoAcumulado = saldoAcumulado + totalNeto - pagado;
       const saldoMostrar = Math.max(0, saldoAcumulado);
 
-      const formatearNum = (num) => num.toFixed(2).replace('.', ',');
-
-      filasTransactions.push([
-        `"${dData.fechaOperacion || dData.dk}"`,
-        `"${dData.tipoDocumento || 'Factura'}"`,
-        `"${dData.numeroFactura || '-'}"`,
-        formatearNum(base),
-        formatearNum(absIva16 * sign),
-        formatearNum(absIva8 * sign),
-        formatearNum(absRet * sign),
-        formatearNum(absRetIva * sign),
-        `"${dData.aplicaRetencionIva === false ? 'No' : (dData.porcentajeRetencionIva || '75') + '%'}"`,
-        formatearNum(totalNeto),
-        formatearNum(pagado),
-        formatearNum(saldoMostrar),
-        `"${dData.referencia || '-'}"`,
-        `"${(dData.observaciones || '').replace(/\n/g, ' ')}"`
-      ]);
+      filasTransactions.push({
+        'Fecha': dData.fechaOperacion || dData.dk,
+        'Tipo de Documento': dData.tipoDocumento || 'Factura',
+        'Nro Referencia': dData.numeroFactura || '-',
+        'Monto Base': dData.tipoDocumento === 'Pago' ? 0 : base,
+        'IVA 16%': dData.tipoDocumento === 'Pago' ? 0 : (absIva16 * sign),
+        'IVA 8%': dData.tipoDocumento === 'Pago' ? 0 : (absIva8 * sign),
+        'Ret. Municipal': dData.tipoDocumento === 'Pago' ? 0 : (absRet * sign),
+        'Ret. IVA': dData.tipoDocumento === 'Pago' ? 0 : (absRetIva * sign),
+        '% Ret. IVA': dData.aplicaRetencionIva === false ? 'No' : (dData.porcentajeRetencionIva || '75') + '%',
+        'Total Bruto': totalNeto,
+        'Pagado': pagado,
+        'Saldo Acumulado': saldoMostrar,
+        'Referencia/Pago': dData.referencia || '-',
+        'Observaciones': dData.observaciones || ''
+      });
     });
 
-    const csvContent = [
-      titular,
-      subTitular,
-      '',
-      headers.join(';'),
-      ...filasTransactions.map(f => f.join(';'))
-    ].join('\n');
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.json_to_sheet(filasTransactions, { header: headers });
 
-    const universalBOM = "\uFEFF";
-    const blob = new Blob([universalBOM + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.setAttribute('download', `Estado_Cuenta_${p.nombre.replace(/\s+/g, '_')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Aplicar formato de contabilidad a los números
+    if (ws['!ref']) {
+      const range = XLSX.utils.decode_range(ws['!ref']);
+      for (let C = range.s.c; C <= range.e.c; ++C) {
+        for (let R = range.s.r; R <= range.e.r; ++R) {
+          const cellStr = XLSX.utils.encode_cell({c: C, r: R});
+          if (ws[cellStr] && typeof ws[cellStr].v === 'number') {
+            ws[cellStr].z = '#,##0.00';
+          }
+        }
+      }
+    }
+
+    XLSX.utils.book_append_sheet(wb, ws, "Estado_de_Cuenta");
+    XLSX.writeFile(wb, `Estado_Cuenta_${p.nombre.replace(/\s+/g, '_')}.xlsx`);
   };
 
   // Eliminar proveedor
@@ -867,6 +891,7 @@ const CuentasPorPagar = () => {
         onSave={guardarDetalleProveedor}
         puedeEditar={puedeEditar}
         puedeEliminar={puedeEliminar}
+        onDescargarReporte={() => descargarReporteProveedorCSV(proveedorSeleccionado)}
       />
     );
   }
@@ -1223,7 +1248,7 @@ const CuentasPorPagar = () => {
                 ${proveedoresFiltrados.reduce((sum, p) => sum + calcularTotalPagado(p), 0).toLocaleString()}
               </td>
               <td className="footer-monto-total highlighted">
-                ${proveedoresFiltrados.reduce((sum, p) => sum + calcularSaldoPendienteGeneral(), 0).toLocaleString()}
+                ${calcularSaldoPendienteGeneral().toLocaleString()}
               </td>
               <td></td>
             </tr>
