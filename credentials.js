@@ -1,6 +1,6 @@
 // Import the functions you need from the SDKs you need
 import { initializeApp } from "firebase/app";
-import { getAnalytics } from "firebase/analytics";
+import { getAnalytics, isSupported } from "firebase/analytics";
 import { initializeFirestore, persistentLocalCache } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 // TODO: Add SDKs for Firebase products that you want to use
@@ -20,10 +20,20 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
-const analytics = getAnalytics(app);
+
+// Analytics solo se inicializa si hay conexión (no es crítico para la app)
+let analytics = null;
+isSupported().then(supported => {
+  if (supported) {
+    analytics = getAnalytics(app);
+  }
+}).catch(() => {
+  console.warn('Analytics no disponible (sin conexión)');
+});
+
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache()
 });
 const auth = getAuth(app);
 
-export { app, analytics, db, auth };
+export { app, analytics, db, auth };
