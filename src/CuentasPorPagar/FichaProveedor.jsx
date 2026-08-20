@@ -32,7 +32,9 @@ const FichaProveedor = ({
     registroDiario: proveedor.registroDiario || {}
   });
 
-  const [fechaActiva, setFechaActiva] = useState(new Date().toISOString().split('T')[0]);
+  const initDate = new Date();
+  const todayStr = `${initDate.getFullYear()}-${String(initDate.getMonth() + 1).padStart(2, '0')}-${String(initDate.getDate()).padStart(2, '0')}`;
+  const [fechaActiva, setFechaActiva] = useState(todayStr);
   const [tabActivo, setTabActivo] = useState('diario'); // 'diario' o 'historial'
   const [mesHistorial, setMesHistorial] = useState(new Date().getMonth() + 1); // 1-12
 
@@ -196,7 +198,7 @@ const FichaProveedor = ({
   const cambiarDia = (dias) => {
     const f = new Date(fechaActiva + 'T00:00:00');
     f.setDate(f.getDate() + dias);
-    setFechaActiva(f.toISOString().split('T')[0]);
+    setFechaActiva(`${f.getFullYear()}-${String(f.getMonth() + 1).padStart(2, '0')}-${String(f.getDate()).padStart(2, '0')}`);
   };
 
   // Historial y Totales Generales

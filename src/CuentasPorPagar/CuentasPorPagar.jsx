@@ -145,8 +145,13 @@ const CuentasPorPagar = () => {
         const base = parseFloat(d.monto) || 0;
         const sign = base < 0 ? -1 : 1;
         const absBase = Math.abs(base);
-        const absIva16 = Math.abs(parseFloat(d.iva16) || 0);
-        const absIva8 = Math.abs(parseFloat(d.iva8) || 0);
+        let absIva16 = 0, absIva8 = 0;
+        if (d.tasaIva === 'Manual') {
+          absIva16 = Math.abs(parseFloat(d.ivaManual) || 0);
+        } else {
+          absIva16 = Math.abs(parseFloat(d.iva16) || 0);
+          absIva8 = Math.abs(parseFloat(d.iva8) || 0);
+        }
         const absRetencion = Math.abs(parseFloat(d.retencion) || 0);
         const absRetencionIva = Math.abs(parseFloat(d.retencionIva) || 0);
 
@@ -276,13 +281,8 @@ const CuentasPorPagar = () => {
       let todasLasTransacciones = [];
       semanas.forEach(semana => {
         const registroSemana = p.registroDiario?.[semana.key] || {};
-        const [d, m, a] = semana.inicio.split('/').map(Number);
-        [0, 1, 2, 3, 4, 5, 6].forEach(i => {
-          const fechaBase = new Date(a, m - 1, d);
-          fechaBase.setDate(fechaBase.getDate() + i);
-          const dk = fechaBase.toISOString().split('T')[0];
-
-          const diaData = registroSemana[dk];
+        
+        Object.entries(registroSemana).forEach(([dk, diaData]) => {
           if (diaData) {
             const registrosDia = Array.isArray(diaData) ? diaData : [diaData];
             registrosDia.forEach(dData => {
@@ -386,14 +386,8 @@ const CuentasPorPagar = () => {
 
     semanas.forEach(semana => {
       const registroSemana = p.registroDiario?.[semana.key] || {};
-      const [d, m, a] = semana.inicio.split('/').map(Number);
 
-      [0, 1, 2, 3, 4, 5, 6].forEach(i => {
-        const fechaBase = new Date(a, m - 1, d);
-        fechaBase.setDate(fechaBase.getDate() + i);
-        const dk = fechaBase.toISOString().split('T')[0];
-
-        const diaData = registroSemana[dk];
+      Object.entries(registroSemana).forEach(([dk, diaData]) => {
         if (diaData) {
           const registrosDia = Array.isArray(diaData) ? diaData : [diaData];
 
