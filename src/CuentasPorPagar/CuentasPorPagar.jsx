@@ -211,13 +211,18 @@ const CuentasPorPagar = () => {
         registroDiario: {}
       };
 
-      const docRef = await addDoc(collection(db, 'por_pagar'), proveedorConDeudas);
-      setProveedores([...proveedores, { id: docRef.id, ...proveedorConDeudas }]);
+      // Generamos la referencia localmente de forma síncrona
+      const docRef = doc(collection(db, 'por_pagar'));
+      setProveedores([...proveedores, { id: docRef.id, ...proveedorConDeudas, esNuevoLocal: true }]);
       setNuevoProveedor({ nombre: '', deudas: [] });
-      await registrarHistorial('CREACIÓN', 'Cuentas por Pagar', docRef.id, { nombre: nuevoProveedor.nombre });
       notificarGuardado('✅ Proveedor creado exitosamente.');
+
+      // Guardamos en segundo plano
+      setDoc(docRef, proveedorConDeudas)
+        .then(() => registrarHistorial('CREACIÓN', 'Cuentas por Pagar', docRef.id, { nombre: nuevoProveedor.nombre }))
+        .catch(error => console.error('Error sincronizando proveedor:', error));
     } catch (error) {
-      console.error('Error agregando proveedor:', error);
+      console.error('Error local agregando proveedor:', error);
     }
   };
 
@@ -713,6 +718,9 @@ const CuentasPorPagar = () => {
   // Filtrar proveedores
   const proveedoresFiltrados = proveedores.filter(proveedor => {
     const coincideNombre = proveedor.nombre.toLowerCase().includes(filtro.toLowerCase());
+
+    if (!coincideNombre) return false;
+    if (proveedor.esNuevoLocal) return true;
 
     // Filtro por semana específica
     if (semanaFiltro) {
