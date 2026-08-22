@@ -46,6 +46,15 @@ const CuentasPorPagar = () => {
   const puedeEliminar = userEmail === 'marco.betancourt@correo.unimet.edu.ve';
   const puedeEditar = puedeEliminar || userEmail === 'reinaldo.pinchopan@gmail.com' || userEmail === 'cxp.pinchopan@gmail.com' || userEmail === 'marcobetancourt2006@gmail.com';
 
+  // Helper: notificar si se guardó online u offline
+  const notificarGuardado = (mensajeOnline = null) => {
+    if (!navigator.onLine) {
+      alert('⚠️ Cambios guardados localmente. Espere a que se restablezca la conexión a internet antes de cerrar la página para que se sincronicen con la base de datos.');
+    } else if (mensajeOnline) {
+      alert(mensajeOnline);
+    }
+  };
+
   // Generar todas las semanas del año actual (Lunes a Domingo)
   const generarSemanasAnioActual = () => {
     const anio = new Date().getFullYear();
@@ -206,6 +215,7 @@ const CuentasPorPagar = () => {
       setProveedores([...proveedores, { id: docRef.id, ...proveedorConDeudas }]);
       setNuevoProveedor({ nombre: '', deudas: [] });
       await registrarHistorial('CREACIÓN', 'Cuentas por Pagar', docRef.id, { nombre: nuevoProveedor.nombre });
+      notificarGuardado('✅ Proveedor creado exitosamente.');
     } catch (error) {
       console.error('Error agregando proveedor:', error);
     }
@@ -237,7 +247,7 @@ const CuentasPorPagar = () => {
       setMostrarModalDetalle(false);
       setProveedorSeleccionado(null);
       await registrarHistorial('EDICIÓN', 'Cuentas por Pagar', proveedorSeleccionado.id, { accion: 'Detalle/Ficha guardada' });
-      alert('Cambios guardados exitosamente en la base de datos.');
+      notificarGuardado('✅ Cambios guardados exitosamente en la base de datos.');
     } catch (error) {
       console.error('Error al guardar en Firebase:', error);
       alert('Error al sincronizar con la base de datos.');
@@ -483,6 +493,7 @@ const CuentasPorPagar = () => {
         await deleteDoc(doc(db, 'por_pagar', id));
         setProveedores(proveedores.filter(p => p.id !== id));
         await registrarHistorial('ELIMINACIÓN', 'Cuentas por Pagar', id, { nombre: proveedor?.nombre });
+        notificarGuardado('✅ Proveedor eliminado exitosamente.');
       } catch (error) {
         console.error('Error eliminando proveedor:', error);
       }
@@ -515,6 +526,7 @@ const CuentasPorPagar = () => {
           });
         });
         await registrarHistorial('ELIMINACIÓN', 'Cuentas por Pagar', 'GLOBAL', { accion: `Semana ${semanaKey} eliminada` });
+        notificarGuardado('✅ Semana eliminada exitosamente.');
       } catch (error) {
         console.error('Error sincronizando eliminación de semana:', error);
       }
@@ -579,6 +591,7 @@ const CuentasPorPagar = () => {
         semana: semanaKey, 
         nuevaDeuda: montoNumerico 
       });
+      notificarGuardado();
     } catch (error) {
       console.error('Error actualizando deuda:', error);
     }
@@ -613,6 +626,7 @@ const CuentasPorPagar = () => {
         semana: semanaKey, 
         nuevoPago: pagoNumerico 
       });
+      notificarGuardado();
     } catch (error) {
       console.error('Error actualizando pago:', error);
     }
@@ -685,6 +699,7 @@ const CuentasPorPagar = () => {
         });
       });
       await registrarHistorial('CREACIÓN', 'Cuentas por Pagar', 'GLOBAL', { accion: `Semana ${nuevaSemanaKey} agregada` });
+      notificarGuardado('✅ Semana agregada exitosamente.');
     } catch (error) {
       console.error('Error sincronizando adición de semana:', error);
     }
