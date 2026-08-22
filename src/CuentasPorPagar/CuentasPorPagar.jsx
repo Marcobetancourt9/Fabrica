@@ -238,19 +238,19 @@ const CuentasPorPagar = () => {
         registroDiario: nuevosDatos.registroDiario
       };
 
-      await updateDoc(pRef, payload);
-
       setProveedores(proveedores.map(p =>
         p.id === proveedorSeleccionado.id ? { ...p, ...payload } : p
       ));
 
       setMostrarModalDetalle(false);
       setProveedorSeleccionado(null);
-      await registrarHistorial('EDICIÓN', 'Cuentas por Pagar', proveedorSeleccionado.id, { accion: 'Detalle/Ficha guardada' });
       notificarGuardado('✅ Cambios guardados exitosamente en la base de datos.');
+
+      updateDoc(pRef, payload)
+        .then(() => registrarHistorial('EDICIÓN', 'Cuentas por Pagar', proveedorSeleccionado.id, { accion: 'Detalle/Ficha guardada' }))
+        .catch(err => console.error('Error sincronizando detalle:', err));
     } catch (error) {
-      console.error('Error al guardar en Firebase:', error);
-      alert('Error al sincronizar con la base de datos.');
+      console.error('Error local al guardar detalle:', error);
     }
   };
 
@@ -578,20 +578,21 @@ const CuentasPorPagar = () => {
         } : deuda
       );
 
-      await updateDoc(doc(db, 'por_pagar', proveedorId), {
-        deudas: deudasActualizadas
-      });
-
       setProveedores(proveedores.map(p =>
         p.id === proveedorId ? { ...p, deudas: deudasActualizadas } : p
       ));
 
       setEditandoDeuda(null);
-      await registrarHistorial('EDICIÓN', 'Cuentas por Pagar', proveedorId, { 
+      notificarGuardado();
+
+      updateDoc(doc(db, 'por_pagar', proveedorId), {
+        deudas: deudasActualizadas
+      })
+      .then(() => registrarHistorial('EDICIÓN', 'Cuentas por Pagar', proveedorId, { 
         semana: semanaKey, 
         nuevaDeuda: montoNumerico 
-      });
-      notificarGuardado();
+      }))
+      .catch(e => console.error('Error sincronizando deuda:', e));
     } catch (error) {
       console.error('Error actualizando deuda:', error);
     }
@@ -613,20 +614,21 @@ const CuentasPorPagar = () => {
         } : deuda
       );
 
-      await updateDoc(doc(db, 'por_pagar', proveedorId), {
-        deudas: deudasActualizadas
-      });
-
       setProveedores(proveedores.map(p =>
         p.id === proveedorId ? { ...p, deudas: deudasActualizadas } : p
       ));
 
       setEditandoPago(null);
-      await registrarHistorial('EDICIÓN', 'Cuentas por Pagar', proveedorId, { 
+      notificarGuardado();
+
+      updateDoc(doc(db, 'por_pagar', proveedorId), {
+        deudas: deudasActualizadas
+      })
+      .then(() => registrarHistorial('EDICIÓN', 'Cuentas por Pagar', proveedorId, { 
         semana: semanaKey, 
         nuevoPago: pagoNumerico 
-      });
-      notificarGuardado();
+      }))
+      .catch(e => console.error('Error sincronizando pago:', e));
     } catch (error) {
       console.error('Error actualizando pago:', error);
     }
