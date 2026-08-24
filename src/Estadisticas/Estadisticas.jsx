@@ -277,12 +277,15 @@ const Estadisticas = () => {
   const customTooltip = ({ active, payload, label }) => {
     if (active && payload && payload.length) {
       return (
-        <div className="custom-tooltip">
-          <p className="label-bold">{`${label}`}</p>
+        <div className="premium-tooltip">
+          <p className="tooltip-title">{`${label}`}</p>
           {payload.map((entry, index) => (
-            <p key={`item-${index}`} style={{ color: entry.color }}>
-              {`${entry.name}: ${formatCurrency(entry.value)}`}
-            </p>
+            <div className="tooltip-item" key={`item-${index}`}>
+              <span className="tooltip-item-name">{entry.name}</span>
+              <span className="tooltip-item-value" style={{ color: entry.color }}>
+                {formatCurrency(entry.value)}
+              </span>
+            </div>
           ))}
         </div>
       );
@@ -293,79 +296,76 @@ const Estadisticas = () => {
   if (cargando && proveedoresData.length === 0) {
     return (
       <div className="cargando-container">
-        <div className="cargando-spinner"></div>
-        <p>Cargando estadísticas de alto rendimiento...</p>
+        <div className="spinner-glow"></div>
+        <p style={{ color: 'var(--text-muted)' }}>Cargando inteligencia financiera...</p>
       </div>
     );
   }
 
   return (
     <div className="estadisticas-container">
-      <header className="app-header responsive-header">
+      <header className="app-header fade-in">
         <div className="header-content">
-          <h1>📊 Panel Estadístico Avanzado</h1>
+          <h1>Panel Estadístico Premium</h1>
           <p>Análisis en tiempo real de saldos, pagos y obligaciones</p>
         </div>
       </header>
 
       {/* Controles: Límite, Período, Gráficas */}
-      <div className="filtros-container">
-        <div className="filtro-card glass-panel">
-          <h2>Filtrar por Mes:</h2>
-          <div className="selector-semana-wrapper">
-            <select 
-              className="select-semana-estadisticas"
-              value={mesSeleccionado} 
-              onChange={(e) => {
-                setMesSeleccionado(e.target.value);
-                setSemanaSeleccionada('todas'); // Limpiar filtro de semana
-              }}
-            >
-              <option value="todos">Todos los meses</option>
-              <option value="1">Enero</option>
-              <option value="2">Febrero</option>
-              <option value="3">Marzo</option>
-              <option value="4">Abril</option>
-              <option value="5">Mayo</option>
-              <option value="6">Junio</option>
-              <option value="7">Julio</option>
-              <option value="8">Agosto</option>
-              <option value="9">Septiembre</option>
-              <option value="10">Octubre</option>
-              <option value="11">Noviembre</option>
-              <option value="12">Diciembre</option>
-            </select>
-          </div>
+      <div className="action-bar fade-in delay-1">
+        
+        <div className="filtro-grupo">
+          <span className="filtro-label">Mes</span>
+          <select 
+            className="select-modern"
+            value={mesSeleccionado} 
+            onChange={(e) => {
+              setMesSeleccionado(e.target.value);
+              setSemanaSeleccionada('todas'); // Limpiar filtro de semana
+            }}
+          >
+            <option value="todos">Todos los meses</option>
+            <option value="1">Enero</option>
+            <option value="2">Febrero</option>
+            <option value="3">Marzo</option>
+            <option value="4">Abril</option>
+            <option value="5">Mayo</option>
+            <option value="6">Junio</option>
+            <option value="7">Julio</option>
+            <option value="8">Agosto</option>
+            <option value="9">Septiembre</option>
+            <option value="10">Octubre</option>
+            <option value="11">Noviembre</option>
+            <option value="12">Diciembre</option>
+          </select>
         </div>
 
-        <div className="filtro-card glass-panel">
-          <h2>Filtrar por Semana:</h2>
-          <div className="selector-semana-wrapper">
-            <select 
-              className="select-semana-estadisticas"
-              value={semanaSeleccionada} 
-              onChange={(e) => {
-                setSemanaSeleccionada(e.target.value);
-                setMesSeleccionado('todos'); // Limpiar filtro de mes
-              }}
-            >
-              <option value="todas">Todas las semanas</option>
-              {semanas.map((s, idx) => (
-                <option key={s.key} value={s.key}>
-                  Semana {idx + 1}: {s.inicio} a {s.fin}
-                </option>
-              ))}
-            </select>
-          </div>
+        <div className="filtro-grupo">
+          <span className="filtro-label">Semana</span>
+          <select 
+            className="select-modern"
+            value={semanaSeleccionada} 
+            onChange={(e) => {
+              setSemanaSeleccionada(e.target.value);
+              setMesSeleccionado('todos'); // Limpiar filtro de mes
+            }}
+          >
+            <option value="todas">Todas las semanas</option>
+            {semanas.map((s, idx) => (
+              <option key={s.key} value={s.key}>
+                Semana {idx + 1}: {s.inicio}
+              </option>
+            ))}
+          </select>
         </div>
 
-        <div className="filtro-card glass-panel">
-          <h2>Mostrar Proveedores:</h2>
-          <div className="botones-limite">
+        <div className="filtro-grupo">
+          <span className="filtro-label">Ver</span>
+          <div className="botones-pill">
             {[5, 10, 25, 50, 'todos'].map((lim) => (
               <button 
                 key={lim}
-                className={`btn-filtro ${limite === lim ? 'activo' : ''}`}
+                className={`btn-pill ${limite === lim ? 'activo' : ''}`}
                 onClick={() => setLimite(lim)}
               >
                 {lim === 'todos' ? 'Todos' : `Top ${lim}`}
@@ -374,13 +374,13 @@ const Estadisticas = () => {
           </div>
         </div>
 
-        <div className="filtro-card glass-panel">
-          <h2>Tipo de visualización:</h2>
-          <div className="botones-graficas">
+        <div className="filtro-grupo">
+          <span className="filtro-label">Gráfica</span>
+          <div className="botones-pill">
             {['barras', 'tarta', 'lineas'].map((tipo) => (
               <button 
                 key={tipo}
-                className={`btn-filtro ${tipoGrafica === tipo ? 'activo' : ''}`}
+                className={`btn-pill ${tipoGrafica === tipo ? 'activo' : ''}`}
                 onClick={() => setTipoGrafica(tipo)}
               >
                 {tipo.charAt(0).toUpperCase() + tipo.slice(1)}
@@ -388,32 +388,33 @@ const Estadisticas = () => {
             ))}
           </div>
         </div>
+
       </div>
 
       {/* Tarjetas KPI */}
-      <div className="kpi-grid">
-        <div className="kpi-card glass-panel">
-          <div className="kpi-icon primary-bg">💰</div>
+      <div className="kpi-grid fade-in delay-2">
+        <div className="kpi-card glass-panel saldo-kpi">
+          <div className="kpi-icon-wrapper">💰</div>
           <div className="kpi-content">
             <h3>Saldo Total {limite !== 'todos' ? `Top ${limite}` : ''}</h3>
             <h2>{formatCurrency(totalSaldoTop)}</h2>
-            <span className="trend positive">+2.5% mes actual</span>
+            <div className="trend-badge up">↑ Activo</div>
           </div>
         </div>
-        <div className="kpi-card glass-panel">
-          <div className="kpi-icon success-bg">💸</div>
+        <div className="kpi-card glass-panel pagos-kpi">
+          <div className="kpi-icon-wrapper">💸</div>
           <div className="kpi-content">
             <h3>Pagos Realizados</h3>
             <h2>{formatCurrency(totalPagosTop)}</h2>
-            <span className="trend positive">+5.1% mes actual</span>
+            <div className="trend-badge up">↑ Efectivo</div>
           </div>
         </div>
-        <div className="kpi-card glass-panel">
-          <div className="kpi-icon warning-bg">📉</div>
+        <div className="kpi-card glass-panel deuda-kpi">
+          <div className="kpi-icon-wrapper">📉</div>
           <div className="kpi-content">
             <h3>Deuda Pendiente</h3>
             <h2 className="text-warning">{formatCurrency(totalPendienteTop)}</h2>
-            <span className="trend negative">-1.2% mes actual</span>
+            <div className="trend-badge down">↓ Atención</div>
           </div>
         </div>
       </div>
@@ -550,7 +551,9 @@ const Estadisticas = () => {
                     </td>
                     <td>
                       <div className="progress-bar-container">
-                        <div className="progress-bar-fill" style={{ width: `${porcentaje}%`, backgroundColor: colores[absoluteIndex % colores.length] }} />
+                        <div className="progress-track">
+                          <div className="progress-fill" style={{ width: `${porcentaje}%`, backgroundColor: colores[absoluteIndex % colores.length] }} />
+                        </div>
                         <span className="progress-text">{formatPercentage(porcentaje)}</span>
                       </div>
                     </td>
