@@ -64,8 +64,15 @@ const Estadisticas = () => {
                     const base = parseFloat(reg.monto) || 0;
                     const sign = base < 0 ? -1 : 1;
                     const absBase = Math.abs(base);
-                    const absIva16 = Math.abs(parseFloat(reg.iva16) || 0);
-                    const absIva8 = Math.abs(parseFloat(reg.iva8) || 0);
+                    
+                    let absIva16 = 0, absIva8 = 0;
+                    if (reg.tasaIva === 'Manual') {
+                      absIva16 = Math.abs(parseFloat(reg.ivaManual) || 0);
+                    } else {
+                      absIva16 = Math.abs(parseFloat(reg.iva16) || 0);
+                      absIva8 = Math.abs(parseFloat(reg.iva8) || 0);
+                    }
+                    
                     const absRet = Math.abs(parseFloat(reg.retencion) || 0);
                     const absRetIva = Math.abs(parseFloat(reg.retencionIva) || 0);
                     const pagado = parseFloat(reg.pagado) || 0;

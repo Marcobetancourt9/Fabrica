@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { db } from '../../credentials';
 import { collection, getDocs, doc, getDoc } from 'firebase/firestore';
+import { descargarReporteAnualExcel } from '../CuentasPorPagar/utils';
 import './TotalDeudas.css';
 
 const TotalDeudas = () => {
@@ -40,8 +41,15 @@ const TotalDeudas = () => {
                     const base = parseFloat(reg.monto) || 0;
                     const sign = base < 0 ? -1 : 1;
                     const absBase = Math.abs(base);
-                    const absIva16 = Math.abs(parseFloat(reg.iva16) || 0);
-                    const absIva8 = Math.abs(parseFloat(reg.iva8) || 0);
+                    
+                    let absIva16 = 0, absIva8 = 0;
+                    if (reg.tasaIva === 'Manual') {
+                      absIva16 = Math.abs(parseFloat(reg.ivaManual) || 0);
+                    } else {
+                      absIva16 = Math.abs(parseFloat(reg.iva16) || 0);
+                      absIva8 = Math.abs(parseFloat(reg.iva8) || 0);
+                    }
+                    
                     const absRet = Math.abs(parseFloat(reg.retencion) || 0);
                     const absRetIva = Math.abs(parseFloat(reg.retencionIva) || 0);
                     const pagado = parseFloat(reg.pagado) || 0;
@@ -250,9 +258,16 @@ const TotalDeudas = () => {
             onChange={(e) => setBusqueda(e.target.value)}
           />
         </div>
-        <div className="info-badge">
-          ℹ️ Los datos se calculan automáticamente desde la página de Cuentas por Pagar.
-        </div>
+        <button 
+          className="btn-reporte-anual" 
+          onClick={() => descargarReporteAnualExcel(proveedoresRaw, semanas)}
+          style={{ padding: '10px 15px', backgroundColor: '#217346', color: 'white', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }}
+        >
+          📥 Reporte Anual Excel
+        </button>
+      </div>
+      <div className="info-badge" style={{ marginTop: '10px' }}>
+        ℹ️ Los datos se calculan automáticamente desde la página de Cuentas por Pagar.
       </div>
       
       {/* Tabla de proveedores */}

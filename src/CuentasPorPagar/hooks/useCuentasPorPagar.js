@@ -349,7 +349,7 @@ export const useCuentasPorPagar = (userEmail) => {
       }
 
       return true;
-    });
+    }).sort((a, b) => a.nombre.localeCompare(b.nombre));
   }, [proveedores, filtro, semanaFiltro, mesFiltro, diaFiltro, semanas, anioFiltro]);
 
   const semanasFiltradasPorAnio = useMemo(() => {
