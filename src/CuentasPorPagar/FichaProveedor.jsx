@@ -113,13 +113,6 @@ const FichaProveedor = ({
   const crearDocumento = (tipoDoc) => {
     const semanaKey = obtenerSemanaKeyDeFecha(fechaActiva);
     if (!semanaKey) return alert("Fecha fuera de rango. Seleccione una fecha válida en las semanas configuradas.");
-    
-    const nuevoRegistro = { ...datosDetalle.registroDiario };
-    if (!nuevoRegistro[semanaKey]) nuevoRegistro[semanaKey] = {};
-    
-    let arr = nuevoRegistro[semanaKey][fechaActiva];
-    if (!arr) arr = [];
-    if (!Array.isArray(arr)) arr = [{ id: 'legacy-' + fechaActiva, ...arr }];
 
     const esResta = tipoDoc === 'Pago' || tipoDoc === 'Nota de Crédito';
     const newDoc = {
@@ -134,36 +127,54 @@ const FichaProveedor = ({
       aplicaRetencionMunicipal: esResta ? false : true,
       aplicaRetencionIva: esResta ? false : true
     };
-    
-    // Lo guardamos ya pre-calculado
     recalcularCamposDerivados(newDoc);
 
-    arr.unshift(newDoc); // Agregamos al inicio
-    nuevoRegistro[semanaKey][fechaActiva] = arr;
-    
-    setDatosDetalle({ ...datosDetalle, registroDiario: nuevoRegistro });
+    setDatosDetalle(prev => {
+      // Copia profunda de los niveles anidados para evitar mutación del estado anterior
+      const nuevoRegistro = { ...prev.registroDiario };
+      nuevoRegistro[semanaKey] = { ...(nuevoRegistro[semanaKey] || {}) };
+
+      let arr = nuevoRegistro[semanaKey][fechaActiva];
+      if (!arr) arr = [];
+      else if (!Array.isArray(arr)) arr = [{ id: 'legacy-' + fechaActiva, ...arr }];
+      else arr = [...arr]; // Copia del array para no mutar el original
+
+      arr.unshift(newDoc); // Agregamos al inicio del array copiado
+      nuevoRegistro[semanaKey][fechaActiva] = arr;
+
+      return { ...prev, registroDiario: nuevoRegistro };
+    });
   };
 
   const eliminarDocumento = (docId) => {
     if(!window.confirm('¿Seguro que desea eliminar este documento? Esta acción es irreversible tras guardar.')) return;
     const semanaKey = obtenerSemanaKeyDeFecha(fechaActiva);
-    const nuevoRegistro = { ...datosDetalle.registroDiario };
-    let arr = nuevoRegistro[semanaKey][fechaActiva];
-    if (!Array.isArray(arr)) arr = [{ id: 'legacy-' + fechaActiva, ...arr }];
-    
-    nuevoRegistro[semanaKey][fechaActiva] = arr.filter(d => (d.id || 'legacy-'+fechaActiva) !== docId);
-    setDatosDetalle({ ...datosDetalle, registroDiario: nuevoRegistro });
+
+    setDatosDetalle(prev => {
+      const nuevoRegistro = { ...prev.registroDiario };
+      nuevoRegistro[semanaKey] = { ...(nuevoRegistro[semanaKey] || {}) };
+
+      let arr = nuevoRegistro[semanaKey][fechaActiva];
+      if (!Array.isArray(arr)) arr = [{ id: 'legacy-' + fechaActiva, ...arr }];
+
+      nuevoRegistro[semanaKey][fechaActiva] = arr.filter(d => (d.id || 'legacy-'+fechaActiva) !== docId);
+      return { ...prev, registroDiario: nuevoRegistro };
+    });
   };
 
   const manejarCambioDoc = (docId, campo, valor) => {
     const semanaKey = obtenerSemanaKeyDeFecha(fechaActiva);
-    const nuevoRegistro = { ...datosDetalle.registroDiario };
-    let arr = nuevoRegistro[semanaKey][fechaActiva];
-    if (!Array.isArray(arr)) arr = [{ id: 'legacy-' + fechaActiva, ...arr }];
-    
-    const newArr = arr.map(doc => {
-       const currId = doc.id || 'legacy-'+fechaActiva;
-       if (currId === docId) {
+
+    setDatosDetalle(prev => {
+      const nuevoRegistro = { ...prev.registroDiario };
+      nuevoRegistro[semanaKey] = { ...(nuevoRegistro[semanaKey] || {}) };
+
+      let arr = nuevoRegistro[semanaKey][fechaActiva];
+      if (!Array.isArray(arr)) arr = [{ id: 'legacy-' + fechaActiva, ...arr }];
+
+      const newArr = arr.map(doc => {
+        const currId = doc.id || 'legacy-'+fechaActiva;
+        if (currId === docId) {
           const updated = { ...doc };
           let nuevoValor = valor;
 
@@ -187,12 +198,13 @@ const FichaProveedor = ({
 
           updated[campo] = nuevoValor;
           return recalcularCamposDerivados(updated);
-       }
-       return doc;
+        }
+        return doc;
+      });
+
+      nuevoRegistro[semanaKey][fechaActiva] = newArr;
+      return { ...prev, registroDiario: nuevoRegistro };
     });
-    
-    nuevoRegistro[semanaKey][fechaActiva] = newArr;
-    setDatosDetalle({ ...datosDetalle, registroDiario: nuevoRegistro });
   };
 
   const cambiarDia = (dias) => {
